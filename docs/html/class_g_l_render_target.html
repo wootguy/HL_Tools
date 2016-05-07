@@ -163,7 +163,12 @@ Public Member Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Constructs a new render target. If bCreate is true, initializes its GL data. </p>
+<p>Constructs a new render target. If bCreate is true, initializes its GL data. </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">bCreate</td><td>Whether or not to create the render target. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -195,12 +200,7 @@ Public Member Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Binds the render target. </p><dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">true</td><td>on success, false otherwise. </td></tr>
-  </table>
-  </dd>
-</dl>
+<p>Binds the render target. </p><dl class="section return"><dt>Returns</dt><dd>true on success, false otherwise. </dd></dl>
 
 </div>
 </div>
@@ -216,12 +216,7 @@ Public Member Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Creates the render target if it doesn't exist yet. </p><dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">true</td><td>on success, false otherwise. </td></tr>
-  </table>
-  </dd>
-</dl>
+<p>Creates the render target if it doesn't exist yet. </p><dl class="section return"><dt>Returns</dt><dd>true on success, false otherwise. </dd></dl>
 
 </div>
 </div>
@@ -415,6 +410,7 @@ Public Member Functions</h2></td></tr>
   <table class="params">
     <tr><td class="paramname">iWidth</td><td>Width, in pixels. </td></tr>
     <tr><td class="paramname">iHeight</td><td>Height, in pixels. </td></tr>
+    <tr><td class="paramname">bUseDepthBuffer</td><td>Whether to use a depth buffer or not. </td></tr>
   </table>
   </dd>
 </dl>

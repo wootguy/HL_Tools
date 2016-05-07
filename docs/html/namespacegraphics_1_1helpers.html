@@ -376,10 +376,11 @@ Functions</h2></td></tr>
 </div><div class="memdoc">
 <p>Draws a mirrored model. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">model</td><td>Model to draw </td></tr>
+    <tr><td class="paramname">pEntity</td><td>Entity to draw </td></tr>
     <tr><td class="paramname">renderMode</td><td>Render mode to use </td></tr>
     <tr><td class="paramname">bWireframeOverlay</td><td>Whether to render a wireframe overlay on top of the model </td></tr>
     <tr><td class="paramname">flSideLength</td><td>Length of one side of the floor </td></tr>
+    <tr><td class="paramname">bBackfaceCulling</td><td>Whether to perform backface culling or not </td></tr>
   </table>
   </dd>
 </dl>
@@ -455,7 +456,7 @@ Functions</h2></td></tr>
   <table class="params">
     <tr><td class="paramname">iWidth</td><td>Width of the viewport </td></tr>
     <tr><td class="paramname">iHeight</td><td>Height of the viewport </td></tr>
-    <tr><td class="paramname">pStudioModel</td><td>Model whose texture is being drawn </td></tr>
+    <tr><td class="paramname">pEntity</td><td>Entity whose model's texture is being drawn </td></tr>
     <tr><td class="paramname">iTexture</td><td>Index of the texture to draw </td></tr>
     <tr><td class="paramname">flTextureScale</td><td>Zoom level </td></tr>
     <tr><td class="paramname">bShowUVMap</td><td>If true, draws the UV map </td></tr>
@@ -483,7 +484,7 @@ Functions</h2></td></tr>
 </div><div class="memdoc">
 <p>Draws a wireframe overlay over a model </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">model</td><td>Model to draw </td></tr>
+    <tr><td class="paramname">pEntity</td><td>Entity to draw </td></tr>
   </table>
   </dd>
 </dl>

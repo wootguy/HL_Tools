@@ -222,7 +222,10 @@ Additional Inherited Members</h2></td></tr>
 </div><div class="memdoc">
 <p>Creates a command with the given name and a function to call on execution. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
+    <tr><td class="paramname">pszName</td><td>Command name. </td></tr>
     <tr><td class="paramname">callbackFn</td><td>Function to call on execution. Must be non-null. </td></tr>
+    <tr><td class="paramname">flags</td><td>Flags. </td></tr>
+    <tr><td class="paramname">pszHelpInfo</td><td>Help info. </td></tr>
   </table>
   </dd>
 </dl>
@@ -275,13 +278,20 @@ Additional Inherited Members</h2></td></tr>
 </div><div class="memdoc">
 <p>Creates a command with the given name and a function to call on execution. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
+    <tr><td class="paramname">pszName</td><td>Command name. </td></tr>
     <tr><td class="paramname">pCallbackObj</td><td>Object to call on execution. May be null. </td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section see"><dt>See also</dt><dd>SetCommandHandler </dd>
-<dd>
-CBaseConCommand::CBaseConCommand( const char* const pszName, const char* const pszHelpInfo ) </dd></dl>
+<dl class="section see"><dt>See also</dt><dd>SetCommandHandler </dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">flags</td><td>Flags. </td></tr>
+    <tr><td class="paramname">pszHelpInfo</td><td>Help info. </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section see"><dt>See also</dt><dd>CBaseConCommand::CBaseConCommand( const char* const pszName, const char* const pszHelpInfo ) </dd></dl>
 
 </div>
 </div>
