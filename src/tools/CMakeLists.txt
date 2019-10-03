@@ -1,4 +1,4 @@
-if (EMSCRIPTEN)
+if (EMSCRIPTEN OR RASPI)
 	add_subdirectory( hlms )
 else()
 	add_subdirectory( hlmv )
