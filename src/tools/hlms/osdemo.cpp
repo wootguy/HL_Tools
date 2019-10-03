@@ -200,9 +200,42 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, 
 		glPopMatrix();
 }
 
-unsigned char *buffer;
+void center_and_scale_model(RenderSettings& settings)
+{
+	// update camera to center and zoom on the model
+	glm::vec3 min = g_pStudioMdlRenderer->m_drawnCoordMin;
+	glm::vec3 max = g_pStudioMdlRenderer->m_drawnCoordMax;
+	glm::vec3 center = min + (max - min)*0.5f;
+	glm::vec3 extentMax = center - min;
+	glm::vec3 extentMin = max - center;
+	
+	// the idea is to calculate how big the model can be and still fit on the screen, but this isn't the way to do it.
+	// TODO: calculate bounding cylinder from model (rotated bounding box) and scale that to match the view frustrum height.
+	float maxX = glm::max(fabs(extentMin.x), fabs(extentMax.x));
+	float maxY = glm::max(fabs(extentMin.y), fabs(extentMax.y));
+	float maxZ = glm::max(fabs(extentMin.z), fabs(extentMax.z));
+	float maxDimH = glm::max(maxX, maxY);
+	float maxDimV = maxZ;
+	float idealMaxDimV = 36.0f; // magic usually-works frustrum height.
+	//float idealMaxDimH = idealMaxDimV * ((float)width/(float)height);
+	float idealMaxDimH = 22.5f;
+	float scaleV = idealMaxDimV / maxDimV;
+	float scaleH = idealMaxDimH / maxDimH;
+	float scale = glm::min(scaleV, scaleH);
+	
+	//printf("Max extents: (%f, %f), Ideal extent: (%f, %f), scale: %f\n", maxDimV, maxDimH, idealMaxDimV, idealMaxDimH, scale);
+	//printf("Bounding box: (%f, %f, %f) (%f, %f, %f)\n", min.x, min.y, min.z, max.x, max.y, max.z);
+	
+	min *= scale;
+	max *= scale;
+	center = min + (max - min)*0.5f;
+	
+	settings.origin = glm::vec3(0, 75.0f, center.z);
+	settings.scale = scale;
+}
 
 #ifdef EMSCRIPTEN
+
 int init_webgl(int width, int height) {
 	if (glfwInit() != GL_TRUE) {
 		printf("glfwInit() failed\n");
@@ -216,36 +249,6 @@ int init_webgl(int width, int height) {
 	
 	return 0;
 }
-#else
-int init_mesa(int width, int height) {
-	/* Create an RGBA-mode context */
-	#if OSMESA_MAJOR_VERSION * 100 + OSMESA_MINOR_VERSION >= 305
-	/* specify Z, stencil, accum sizes */
-		OSMesaContext ctx = OSMesaCreateContextExt( GL_RGBA, 16, 0, 0, NULL );
-	#else
-		OSMesaContext ctx = OSMesaCreateContext( GL_RGBA, NULL );
-	#endif
-	if (!ctx) {
-		printf("OSMesaCreateContext failed!\n");
-		return 1;
-	}
-
-	/* Allocate the image buffer */
-	buffer = (unsigned char *) malloc( width * height * 4 * sizeof(unsigned char));
-	if (!buffer) {
-		printf("Alloc image buffer failed!\n");
-		return 1;
-	}
-
-	/* Bind the buffer to the context and make it current */
-	if (!OSMesaMakeCurrent( ctx, buffer, GL_UNSIGNED_BYTE, width, height )) {
-		printf("OSMesaMakeCurrent failed!\n");
-		return 1;
-	}
-}
-#endif
-
-#ifdef EMSCRIPTEN
 
 #include <emscripten/emscripten.h>
 #include <sys/time.h>
@@ -324,36 +327,7 @@ void em_loop() {
 
 	render_model(mdl, settings);
 
-	// update camera to center and zoom on the model
-	{
-		glm::vec3 min = g_pStudioMdlRenderer->m_drawnCoordMin;
-		glm::vec3 max = g_pStudioMdlRenderer->m_drawnCoordMax;
-		glm::vec3 center = min + (max - min)*0.5f;
-		glm::vec3 extentMax = center - min;
-		glm::vec3 extentMin = max - center;
-		
-		float maxX = glm::max(fabs(extentMin.x), fabs(extentMax.x));
-		float maxY = glm::max(fabs(extentMin.y), fabs(extentMax.y));
-		float maxZ = glm::max(fabs(extentMin.z), fabs(extentMax.z));
-		float maxDimH = glm::max(maxX, maxY);
-		float maxDimV = maxZ;
-		float idealMaxDimV = 36.0f;
-		float idealMaxDimH = idealMaxDimV * ((float)width/(float)height);
-		//float idealMaxDimH = 28.0f;
-		float scaleV = idealMaxDimV / maxDimV;
-		float scaleH = idealMaxDimH / maxDimH;
-		float scale = glm::min(scaleV, scaleH);
-		
-		//printf("Max extents: (%f, %f), Ideal extent: (%f, %f), scale: %f\n", maxDimV, maxDimH, idealMaxDimV, idealMaxDimH, scale);
-		//printf("Bounding box: (%f, %f, %f) (%f, %f, %f)\n", min.x, min.y, min.z, max.x, max.y, max.z);
-		
-		min *= scale;
-		max *= scale;
-		center = min + (max - min)*0.5f;
-		
-		settings.origin = glm::vec3(0, 75.0f, center.z);
-		settings.scale = scale;
-	}
+	center_and_scale_model(settings);
 }
 
 // functions to be called from javascript
@@ -392,6 +366,35 @@ int main( int argc, char *argv[] )
 	return 0;
 }
 #else
+
+unsigned char *buffer;
+
+int init_mesa(int width, int height) {
+	/* Create an RGBA-mode context */
+	#if OSMESA_MAJOR_VERSION * 100 + OSMESA_MINOR_VERSION >= 305
+	/* specify Z, stencil, accum sizes */
+		OSMesaContext ctx = OSMesaCreateContextExt( GL_RGBA, 16, 0, 0, NULL );
+	#else
+		OSMesaContext ctx = OSMesaCreateContext( GL_RGBA, NULL );
+	#endif
+	if (!ctx) {
+		printf("OSMesaCreateContext failed!\n");
+		return 1;
+	}
+
+	/* Allocate the image buffer */
+	buffer = (unsigned char *) malloc( width * height * 4 * sizeof(unsigned char));
+	if (!buffer) {
+		printf("Alloc image buffer failed!\n");
+		return 1;
+	}
+
+	/* Bind the buffer to the context and make it current */
+	if (!OSMesaMakeCurrent( ctx, buffer, GL_UNSIGNED_BYTE, width, height )) {
+		printf("OSMesaMakeCurrent failed!\n");
+		return 1;
+	}
+}
 
 static void write_png(const char *filename, const unsigned char *buffer, int width, int height)
 {
@@ -447,8 +450,6 @@ int main( int argc, char *argv[] )
 	setbuf(stdout, NULL);
 	RenderSettings settings;
 	
-	init_mesa(width, height);
-	
 	if (argc != 7) {
 		printf("Usage:\n");
 		printf("hlms [model_name] [output_image_basename] [widthxheight] [sequence] [frames] [loops]\n");
@@ -459,6 +460,7 @@ int main( int argc, char *argv[] )
 	const char* imgName = argv[2];
 	std::string dimstr = std::string(argv[3]);
 	settings.seq = atoi(argv[4]);
+	settings.frame = 0;
 	int frames = atoi(argv[5]);
 	int loops = atoi(argv[6]);
 	int width = 500;
@@ -474,55 +476,32 @@ int main( int argc, char *argv[] )
 	settings.width = width;
 	settings.height = height;
 	
+	init_mesa(width, height);
+	
 	printf("Frame dimensions: %ix%i\n", width, height);
 	
 	printf("Animation frames: %i, sequence loops: %i\n", frames, loops);
 	
 	studiomdl::CStudioModel* mdl = loadModel(mdlName);
+	if (!mdl) {
+		return 1;
+	}
 	
 	printf("Calculating model extents...");
 	float angleStep = 360.0f / (float)frames;
-	while(true) {
-		settings.angles.y += angleStep;
+	for (int i = 0; i < frames; i++) {
 		render_model(mdl, settings, true);
+		settings.angles.y += angleStep;
 	}
 	printf("DONE\n");
 	
 	// now that we know how much space the model uses, draw again with a centered camera and create the images
-	{
-		glm::vec3 min = g_pStudioMdlRenderer->m_drawnCoordMin;
-		glm::vec3 max = g_pStudioMdlRenderer->m_drawnCoordMax;
-		glm::vec3 center = min + (max - min)*0.5f;
-		glm::vec3 extentMax = center - min;
-		glm::vec3 extentMin = max - center;
-		
-		float maxX = glm::max(fabs(extentMin.x), fabs(extentMax.x));
-		float maxY = glm::max(fabs(extentMin.y), fabs(extentMax.y));
-		float maxZ = glm::max(fabs(extentMin.z), fabs(extentMax.z));
-		float maxDimH = glm::max(maxX, maxY);
-		float maxDimV = maxZ;
-		float idealMaxDimV = 36.0f;
-		float idealMaxDimH = idealMaxDimV * ((float)width/(float)height);
-		//float idealMaxDimH = 28.0f;
-		float scaleV = idealMaxDimV / maxDimV;
-		float scaleH = idealMaxDimH / maxDimH;
-		float scale = glm::min(scaleV, scaleH);
-		
-		printf("Max extents: (%f, %f), Ideal extent: (%f, %f), scale: %f\n", maxDimV, maxDimH, idealMaxDimV, idealMaxDimH, scale);
-		printf("Bounding box: (%f, %f, %f) (%f, %f, %f)\n", min.x, min.y, min.z, max.x, max.y, max.z);
-		
-		min *= scale;
-		max *= scale;
-		center = min + (max - min)*0.5f;
-		
-		settings.origin = glm::vec3(0, 72.0f, center.z);
-		settings.scale = scale;
-	}
+	center_and_scale_model(settings);
 		
 	settings.angles = glm::vec3(0,0,0);
 	for (int i = 0; i < frames; i++) {
 		printf("Render frame %i/%i...", i+1, frames);
-		render_model(mdl, settings, false, false);
+		render_model(mdl, settings);
 		
 		std::string idx = std::to_string(i);
 		if (i < 100) {
@@ -542,7 +521,7 @@ int main( int argc, char *argv[] )
 	/* free the image buffer */
 	free( buffer );
 
-	OSMesaDestroyContext( ctx );
+	//OSMesaDestroyContext( ctx );
  
    return 0;
 }
