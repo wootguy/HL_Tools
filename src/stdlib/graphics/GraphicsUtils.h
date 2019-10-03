@@ -9,6 +9,10 @@
 
 #include "OpenGL.h"
 
+#ifdef EMSCRIPTEN
+#include <GL/glfw.h>
+#endif
+
 namespace graphics
 {
 /**

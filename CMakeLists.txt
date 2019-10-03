@@ -34,7 +34,7 @@ project( HL_Tools )
 set( SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src )
 
 if( UNIX )	
-	set( LINUX_32BIT_FLAG "-m32" )
+	#set( LINUX_32BIT_FLAG "-m32" )
 else()
 	set( LINUX_32BIT_FLAG "" )
 endif()
@@ -126,7 +126,7 @@ if( WIN32 )
 	)
 else()
 	set( SHARED_COMPILE_FLAGS
-		"${LINUX_32BIT_FLAG} -fPIC"
+		"${LINUX_32BIT_FLAG} -fPIC -std=c++17 -lstdc++fs"
 	)
 endif()
 
@@ -138,6 +138,10 @@ else()
 	set( WX_SHARED_COMPILE_FLAGS
 		${SHARED_COMPILE_FLAGS}
 	)
+endif()
+
+if (EMSCRIPTEN)
+	set( SHARED_COMPILE_FLAGS "${SHARED_COMPILE_FLAGS} -DEMSCRIPTEN -O2")
 endif()
 
 #Shared linker settings

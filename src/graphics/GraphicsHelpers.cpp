@@ -51,11 +51,12 @@ void SetupRenderMode( RenderMode renderMode, const bool bBackfaceCulling )
 
 			glEnable( GL_DEPTH_TEST );
 
-			if( renderMode == RenderMode::FLAT_SHADED )
-				glShadeModel( GL_FLAT );
-			else
-				glShadeModel( GL_SMOOTH );
-
+			#ifndef EMSCRIPTEN
+				if( renderMode == RenderMode::FLAT_SHADED )
+					glShadeModel( GL_FLAT );
+				else
+					glShadeModel( GL_SMOOTH );
+			#endif
 			break;
 		}
 
@@ -74,8 +75,9 @@ void SetupRenderMode( RenderMode renderMode, const bool bBackfaceCulling )
 			}
 
 			glEnable( GL_DEPTH_TEST );
+			#ifndef EMSCRIPTEN
 			glShadeModel( GL_SMOOTH );
-
+			#endif
 			break;
 		}
 

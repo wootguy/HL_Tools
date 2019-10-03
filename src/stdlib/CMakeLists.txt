@@ -47,12 +47,20 @@ if( NOT OPENGL_FOUND )
 	MESSAGE( FATAL_ERROR "Could not locate OpenGL library" )
 endif()
 
-target_link_libraries( ${TARGET_NAME}
-	Keyvalues
-	${GLEW}
-	${OPENGL_LIBRARIES}
-	${SHARED_DEPENDENCIES}
-)
+if (EMSCRIPTEN)
+	target_link_libraries( ${TARGET_NAME}
+		Keyvalues
+		${OPENGL_LIBRARIES}
+		${SHARED_DEPENDENCIES}
+	)
+else()
+	target_link_libraries( ${TARGET_NAME}
+		Keyvalues
+		${GLEW}
+		${OPENGL_LIBRARIES}
+		${SHARED_DEPENDENCIES}
+	)
+endif()
 
 #Create filters
 create_source_groups( "${CMAKE_CURRENT_SOURCE_DIR}" )

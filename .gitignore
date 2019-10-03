@@ -85,3 +85,4 @@ bin/sprifile.txt
 
 #CMake build directories
 bin_*/*
+/build

@@ -1,5 +1,4 @@
 #include <cassert>
-#include <filesystem>
 #include <memory>
 
 #include "shared/Platform.h"
@@ -34,7 +33,7 @@ void UploadRGBATexture( const int iWidth, const int iHeight, const byte* pData, 
 {
 	glBindTexture( GL_TEXTURE_2D, textureId );
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, iWidth, iHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, pData );
-	glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
+	//glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE ); // not supported in emscripten, and not needed anyway
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, bFilterTextures ? GL_LINEAR : GL_NEAREST );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, bFilterTextures ? GL_LINEAR : GL_NEAREST );
 }
@@ -434,7 +433,8 @@ StudioModelLoadResult LoadStudioHeader( const char* const pszFilename, const boo
 
 StudioModelLoadResult LoadStudioModel( const char* const pszFilename, CStudioModel*& pModel )
 {
-	const auto bIsDol = std::experimental::filesystem::path( pszFilename ).extension() == ".dol";
+	//const auto bIsDol = std::experimental::filesystem::path( pszFilename ).extension() == ".dol";
+	const auto bIsDol = false; // wtf is a dol anyway
 
 	//Takes care of cleanup on failure.
 	std::unique_ptr<CStudioModel> studioModel( new CStudioModel() );

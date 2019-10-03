@@ -72,6 +72,11 @@ public:
 	void DrawSingleBone( const int iBone ) override final;
 
 	void DrawSingleAttachment( const int iAttachment ) override final;
+	
+	/*
+	* Min/Max vertex coordinate values that were drawn. For calculating a bounding box.
+	*/
+	glm::vec3 m_drawnCoordMax, m_drawnCoordMin;
 
 private:
 	void DrawBones();
