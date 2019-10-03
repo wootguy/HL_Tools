@@ -213,7 +213,7 @@ public:
 	*	@see SetThink( void ( T::*func )() )
 	*	Overload used to set the think method to null.
 	*/
-	void SetThink( nullptr_t )
+	void SetThink( std::nullptr_t )
 	{
 		m_ThinkFunc = nullptr;
 	}

@@ -191,7 +191,9 @@ void CStudioModelRenderer::DrawSingleBone( const int iBone )
 
 	if( pbones[ iBone ].parent >= 0 )
 	{
+		#ifndef EMSCRIPTEN
 		glPointSize( 10.0f );
+		#endif
 		glColor3f( 0, 0.7f, 1 );
 		glBegin( GL_LINES );
 		glVertex3f( m_bonetransform[ pbones[ iBone ].parent ][ 0 ][ 3 ], m_bonetransform[ pbones[ iBone ].parent ][ 1 ][ 3 ], m_bonetransform[ pbones[ iBone ].parent ][ 2 ][ 3 ] );
@@ -208,14 +210,18 @@ void CStudioModelRenderer::DrawSingleBone( const int iBone )
 	else
 	{
 		// draw parent bone node
+		#ifndef EMSCRIPTEN
 		glPointSize( 10.0f );
+		#endif
 		glColor3f( 0.8f, 0, 0 );
 		glBegin( GL_POINTS );
 		glVertex3f( m_bonetransform[ iBone ][ 0 ][ 3 ], m_bonetransform[ iBone ][ 1 ][ 3 ], m_bonetransform[ iBone ][ 2 ][ 3 ] );
 		glEnd();
 	}
 
+	#ifndef EMSCRIPTEN
 	glPointSize( 1.0f );
+	#endif
 }
 
 void CStudioModelRenderer::DrawSingleAttachment( const int iAttachment )
@@ -248,12 +254,16 @@ void CStudioModelRenderer::DrawSingleAttachment( const int iAttachment )
 	glVertex3fv( glm::value_ptr( v[ 3 ] ) );
 	glEnd();
 
+	#ifndef EMSCRIPTEN
 	glPointSize( 10 );
+	#endif
 	glColor3f( 0, 1, 0 );
 	glBegin( GL_POINTS );
 	glVertex3fv( glm::value_ptr( v[ 0 ] ) );
 	glEnd();
+	#ifndef EMSCRIPTEN
 	glPointSize( 1 );
+	#endif
 }
 
 void CStudioModelRenderer::DrawBones()
@@ -266,7 +276,9 @@ void CStudioModelRenderer::DrawBones()
 	{
 		if( pbones[ i ].parent >= 0 )
 		{
+			#ifndef EMSCRIPTEN
 			glPointSize( 3.0f );
+			#endif
 			glColor3f( 1, 0.7f, 0 );
 			glBegin( GL_LINES );
 			glVertex3f( m_bonetransform[ pbones[ i ].parent ][ 0 ][ 3 ], m_bonetransform[ pbones[ i ].parent ][ 1 ][ 3 ], m_bonetransform[ pbones[ i ].parent ][ 2 ][ 3 ] );
@@ -283,7 +295,9 @@ void CStudioModelRenderer::DrawBones()
 		else
 		{
 			// draw parent bone node
+			#ifndef EMSCRIPTEN
 			glPointSize( 5.0f );
+			#endif
 			glColor3f( 0.8f, 0, 0 );
 			glBegin( GL_POINTS );
 			glVertex3f( m_bonetransform[ i ][ 0 ][ 3 ], m_bonetransform[ i ][ 1 ][ 3 ], m_bonetransform[ i ][ 2 ][ 3 ] );
@@ -291,7 +305,9 @@ void CStudioModelRenderer::DrawBones()
 		}
 	}
 
+	#ifndef EMSCRIPTEN
 	glPointSize( 1.0f );
+	#endif
 }
 
 void CStudioModelRenderer::DrawAttachments()
@@ -323,12 +339,16 @@ void CStudioModelRenderer::DrawAttachments()
 		glVertex3fv( glm::value_ptr( v[ 3 ] ) );
 		glEnd();
 
+		#ifndef EMSCRIPTEN
 		glPointSize( 5 );
+		#endif
 		glColor3f( 0, 1, 0 );
 		glBegin( GL_POINTS );
 		glVertex3fv( glm::value_ptr( v[ 0 ] ) );
 		glEnd();
+		#ifndef EMSCRIPTEN
 		glPointSize( 1 );
+		#endif
 	}
 }
 
@@ -338,12 +358,16 @@ void CStudioModelRenderer::DrawEyePosition()
 	glDisable( GL_CULL_FACE );
 	glDisable( GL_DEPTH_TEST );
 
+	#ifndef EMSCRIPTEN
 	glPointSize( 7 );
+	#endif
 	glColor3f( 1, 0, 1 );
 	glBegin( GL_POINTS );
 	glVertex3fv( glm::value_ptr( m_pStudioHdr->eyeposition ) );
 	glEnd();
+	#ifndef EMSCRIPTEN
 	glPointSize( 1 );
+	#endif
 }
 
 void CStudioModelRenderer::DrawHitBoxes()
@@ -1006,7 +1030,15 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 					}
 				}
 
-				glVertex3fv( glm::value_ptr( m_pxformverts[ ptricmds[ 0 ] ] ) );
+				glm::vec3 vert = m_pxformverts[ ptricmds[ 0 ] ];
+				if (vert.x < m_drawnCoordMin.x) m_drawnCoordMin.x = vert.x;
+				if (vert.y < m_drawnCoordMin.y) m_drawnCoordMin.y = vert.y;
+				if (vert.z < m_drawnCoordMin.z) m_drawnCoordMin.z = vert.z;
+				if (vert.x > m_drawnCoordMax.x) m_drawnCoordMax.x = vert.x;
+				if (vert.y > m_drawnCoordMax.y) m_drawnCoordMax.y = vert.y;
+				if (vert.z > m_drawnCoordMax.z) m_drawnCoordMax.z = vert.z;
+				
+				glVertex3fv( glm::value_ptr( vert ) );
 			}
 			glEnd();
 		}

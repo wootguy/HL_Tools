@@ -5,6 +5,10 @@
 
 #include "OpenGL.h"
 
+#ifdef EMSCRIPTEN
+#include <GL/glfw.h>
+#endif
+
 /**
 *	This class represents a render target. It can be used to draw to and then retrieve the pixel contents.
 *	You must set the context to current yourself.
