@@ -485,18 +485,100 @@ static void write_png(const char *filename, const unsigned char *buffer, int wid
 		printf("PNG encode error: %s\n", lodepng_error_text(error));
 }
 
+void print_model_info(studiomdl::CStudioModel* mdl) {
+	studiohdr_t* header = mdl->GetStudioHeader();
+
+	int tri_count = 0;
+	// TODO: buffer overflow safety
+	for (int b = 0; b < header->numbodyparts; b++) {
+		mstudiobodyparts_t* bod = header->GetBodypart(b);
+		for (int i = 0; i < bod->nummodels; i++)
+		{
+			mstudiomodel_t* mod = reinterpret_cast<mstudiomodel_t*>( header->GetData() + bod->modelindex + i*sizeof(mstudiomodel_t));
+			
+			for (int k = 0; k < mod->nummesh; k++) {
+				mstudiomesh_t* mesh = reinterpret_cast<mstudiomesh_t*>( header->GetData() + mod->meshindex + k*sizeof(mstudiomesh_t));
+				tri_count += mesh->numtris;
+			}
+		}
+	}
+	bool uses_t_model = header->numtextures == 0 && tri_count > 0;
+	
+	std::string sequence_names;
+	
+	std::vector<std::string> events;
+	for (int i = 0; i < header->numseq; i++)
+	{
+		mstudioseqdesc_t* seq = header->GetSequence(i);
+		
+		std::string label = seq->label;
+		if (sequence_names.length() == 0) {
+			sequence_names = label;
+		} else {
+			sequence_names += "|" + label;
+		}
+	
+		for (int k = 0; k < seq->numevents; k++)
+		{
+			mstudioevent_t* evt = reinterpret_cast<mstudioevent_t*>( header->GetData() + seq->eventindex + k*sizeof(mstudioevent_t));
+			// TODO: buffer overflow safety
+
+			std::string opt = evt->options;
+			if (opt.length() == 0)
+				continue;
+
+			if (evt->event == 1004 || evt->event == 1008 || evt->event == 5004) // play sound
+			{
+				std::string snd = evt->options;
+				if (snd[0] == '*')
+					snd = snd.substr(1); // not sure why some models do this but it looks pointless.
+				
+				events.push_back(std::to_string(i) + "|" + std::to_string(evt->frame) + "|" + snd);
+			}
+			// TODO: muzzleflash configs? Are those even possible in player models?
+		}
+	}
+	
+	printf("!BEGIN_MODEL_INFO!\n");
+	printf("tri_count=%i\n", tri_count);
+	printf("t_model=%i\n", uses_t_model);
+	printf("seq_groups=%i\n", header->numseqgroups);
+	for (int i = 0; i < events.size(); i++) {
+		printf("event=%s\n", events[i].c_str());
+	}
+	printf("!END_MODEL_INFO!\n");
+}
+
 int main( int argc, char *argv[] )
 {
 	setbuf(stdout, NULL);
 	RenderSettings settings;
+	bool infoMode = false;
 	
-	if (argc != 7) {
+	if (argc == 2) {
+		infoMode = true;
+	} else if (argc == 7) {
+		infoMode = false;
+	} else {
+		printf("Wrong number of arguments (%i)\n\n", argc);
+		
 		printf("Usage:\n");
-		printf("hlms [model_name] [output_image_basename] [widthxheight] [sequence] [frames] [loops]\n");
+		printf("    hlms [model_name] [output_image_basename] [widthxheight] [sequence] [frames] [loops]\n");
+		printf("    hlms [model_name]\n");
 		return 1;
 	}
 	
 	const char* mdlName = argv[1];
+	if (infoMode) {
+		// just print some info about the model
+		studiomdl::CStudioModel* mdl = loadModel(mdlName);
+		if (!mdl) {
+			return 1;
+		}
+		print_model_info(mdl);
+		return 0;
+	}
+	
 	const char* imgName = argv[2];
 	std::string dimstr = std::string(argv[3]);
 	settings.seq = atoi(argv[4]);
@@ -515,17 +597,17 @@ int main( int argc, char *argv[] )
 	}
 	settings.width = width;
 	settings.height = height;
-	
+
 	init_mesa(width, height);
-	
-	printf("Frame dimensions: %ix%i\n", width, height);
-	
-	printf("Animation frames: %i, sequence loops: %i\n", frames, loops);
 	
 	studiomdl::CStudioModel* mdl = loadModel(mdlName);
 	if (!mdl) {
 		return 1;
 	}
+	
+	printf("Frame dimensions: %ix%i\n", width, height);
+	
+	printf("Animation frames: %i, sequence loops: %i\n", frames, loops);	
 	
 	printf("Calculating model extents...");
 	float angleStep = 360.0f / (float)frames;
