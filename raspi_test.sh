@@ -27,5 +27,5 @@ exit
 
 echo "Creating webm..."
 # crf = 0-63 (good-bad quality)
-ffmpeg -y -r 30 -f image2 -i build/asdf%03d.png -pix_fmt yuva420p -c:v libvpx-vp9 -b:v 0 -crf 30 -pass 1 -an -f webm NUL
+ffmpeg -y -r 30 -f image2 -i build/asdf%03d.png -pix_fmt yuva420p -c:v libvpx-vp9 -b:v 0 -crf 30 -pass 1 -an -f webm /dev/null
 ffmpeg -y -r 30 -f image2 -i build/asdf%03d.png -pix_fmt yuva420p -c:v libvpx-vp9 -b:v 0 -crf 30 -pass 2 -an asdf.webm
