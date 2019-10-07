@@ -362,19 +362,50 @@ void em_loop() {
 	center_and_scale_model(settings);
 }
 
+bool file_exists(std::string fpath) {
+	if (FILE *file = fopen(fpath.c_str(), "r"))
+	{
+		fclose(file);
+		return true;
+	}
+	return false;
+}
+
+
+void download_file(std::string url, std::string local_file)
+{
+	if (file_exists(local_file))
+	{
+		printf("Loading %s from cache\n", local_file.c_str());
+	} else {
+		printf("Downloading file %s -> %s\n", url.c_str(), local_file.c_str());
+		emscripten_wget(url.c_str(), local_file.c_str());
+	}
+}
+
 // functions to be called from javascript
 extern "C" {
-	EMSCRIPTEN_KEEPALIVE void load_new_model(const char* url, const char* fpath) {		
-		if (FILE *file = fopen(fpath, "r"))
-		{
-			fclose(file);
-			printf("Loading %s from cache\n", fpath);
-		} else {
-			printf("Downloading file %s -> %s\n", url, fpath);
-			emscripten_wget(url, fpath);
+	EMSCRIPTEN_KEEPALIVE void load_new_model(const char* model_folder_url, const char* model_name, const char* t_model, int seq_groups) {		
+		std::string model_folder_url_str(model_folder_url);
+		std::string model_name_str(model_name);
+		std::string mdl_path = model_name_str + ".mdl";
+		std::string t_mdl_path = std::string(t_model);
+		
+		std::string mdl_url = model_folder_url_str + mdl_path;
+		
+		download_file(mdl_url, mdl_path);
+		if (t_mdl_path.size() > 0) {
+			download_file(model_folder_url_str + t_mdl_path, t_mdl_path);
+		}
+		for (int i = 1; i < seq_groups; i++) {
+			std::string seq_mdl_path = model_name_str;
+			if (i < 10)
+				seq_mdl_path += "0";
+			seq_mdl_path += std::to_string(i) + ".mdl";
+			download_file(model_folder_url_str + seq_mdl_path, seq_mdl_path);
 		}
 
-		mdlTemp = loadModel(fpath);
+		mdlTemp = loadModel(mdl_path.c_str());
 		newModelReady = mdlTemp != NULL;
 		
 		if (!newModelReady) {
@@ -391,10 +422,7 @@ extern "C" {
 
 int main( int argc, char *argv[] )
 {
-	printf("HEWO WOYL\n");
 	setbuf(stdout, NULL);
-	
-	printf("Prepare to init webgl\n");
 	
 	init_webgl(width, height);
 	
