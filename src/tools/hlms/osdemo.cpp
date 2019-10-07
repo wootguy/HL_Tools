@@ -262,6 +262,7 @@ RenderSettings settings;
 studiomdl::CStudioModel* mdl = NULL;
 studiomdl::CStudioModel* mdlTemp;
 static volatile bool newModelReady = false;
+static volatile bool shouldUnloadCurrentModel = false;
 
 int width = 500;
 int height = 800;
@@ -277,11 +278,23 @@ uint64 getSystemTime()
 
 uint64 lastFrameTime;
 std::deque<float> framerates;
+bool program_ready = false;
+
 
 void em_loop() {
 	
+	if (shouldUnloadCurrentModel) {
+		printf("Unloading model\n");
+		if (mdl) {
+			delete mdl;
+			mdl = NULL;
+		}
+		glClearColor( 0,0,0, 0 );
+		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+		shouldUnloadCurrentModel = false;
+	}
+	
 	if (newModelReady) {
-		printf("OMG A NEW MODEL IS READY LETS USE IT\n");
 		if (mdl) delete mdl;
 		mdl = mdlTemp;
 		newModelReady = false;
@@ -295,6 +308,23 @@ void em_loop() {
 		// calculate model size then render again to correct the camera position
 		em_loop(); settings.angles.y = 0;
 		em_loop(); settings.angles.y = 0;
+		
+		// call js function to signal loading finished
+		EM_ASM(
+			hlms_model_load_complete(true);
+		);
+	}
+	
+	// for some reason this doesn't work in the main method
+	if (!program_ready) {
+		program_ready = true;
+		EM_ASM(
+			hlms_ready();
+		);
+	}
+	
+	if (!mdl) {
+		return; // wait for a model to be loaded
 	}
 	
 	uint64 now = emscripten_get_now();
@@ -312,12 +342,14 @@ void em_loop() {
 		avgFramerate += framerates[i];
 	}
 	avgFramerate /= (float)framerates.size();
-	
-	settings.frame += settings.idealFps / framerate;
-	while (settings.frame >= settings.seqFrames-1) {
-		settings.frame -= (settings.seqFrames-1);
+
+	if (settings.seqFrames > 1) {
+		settings.frame += settings.idealFps / framerate;
+		while (settings.frame >= settings.seqFrames-1) {
+			settings.frame -= (settings.seqFrames-1);
+		}
 	}
-	
+
 	settings.angles.y += 90.0f / framerate;
 	while (settings.angles.y > 360) {
 		settings.angles.y -= 360;
@@ -332,19 +364,28 @@ void em_loop() {
 
 // functions to be called from javascript
 extern "C" {
-	EMSCRIPTEN_KEEPALIVE void load_new_model(const char* url, const char* fpath) {
-		printf("ZOMG WE SHOULD LOAD A NEW MODEL %s -> %s\n", url, fpath);
-		
+	EMSCRIPTEN_KEEPALIVE void load_new_model(const char* url, const char* fpath) {		
 		if (FILE *file = fopen(fpath, "r"))
 		{
 			fclose(file);
-			printf("ZOMG FILE ALREADY EXISTS I GUESS JUST LOAD IT\n");
+			printf("Loading %s from cache\n", fpath);
 		} else {
+			printf("Downloading file %s -> %s\n", url, fpath);
 			emscripten_wget(url, fpath);
 		}
 
 		mdlTemp = loadModel(fpath);
-		newModelReady = true;
+		newModelReady = mdlTemp != NULL;
+		
+		if (!newModelReady) {
+			EM_ASM(
+				hlms_model_load_complete(false);
+			);
+		}
+	}
+	
+	EMSCRIPTEN_KEEPALIVE void unload_model() {
+		shouldUnloadCurrentModel = true;
 	}
 }
 
@@ -356,13 +397,12 @@ int main( int argc, char *argv[] )
 	printf("Prepare to init webgl\n");
 	
 	init_webgl(width, height);
-
-	load_new_model("/scmodeldb/betagordon.mdl", "betagordon.mdl");
 	
 	settings.width = width;
 	settings.height = height;
 	
 	emscripten_set_main_loop(em_loop, 0, 1);
+	
 	return 0;
 }
 #else

@@ -43,15 +43,13 @@ endif()
 if(EMSCRIPTEN)
 	set(CMAKE_EXECUTABLE_SUFFIX ".html")
 	
-	link_directories(${CMAKE_CURRENT_BINARY_DIR}/../../../bin)
-	
-	set(SHELL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/../../../shell.html)
+	set(SHELL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/shell.html)
 	set(LNK_FLAGS "-s TOTAL_MEMORY=67108864 \
 		-s LEGACY_GL_EMULATION=1 \
+		-s GL_FFP_ONLY=1 \
 		-s ASYNCIFY=1 \
 		-s EXTRA_EXPORTED_RUNTIME_METHODS=[\"ccall\"] \
 		--shell-file ${SHELL_FILE}")
-		# --preload-file ../../../../data@/
 	set_target_properties(${TARGET_NAME} PROPERTIES LINK_FLAGS ${LNK_FLAGS})
 	
 	target_link_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../../../bin)

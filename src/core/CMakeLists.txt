@@ -17,7 +17,7 @@ add_subdirectory( shared )
 
 preprocess_sources()
 
-add_library( ${TARGET_NAME} SHARED ${PREP_SRCS} )
+add_library( ${TARGET_NAME} STATIC ${PREP_SRCS} )
 
 check_winxp_support( ${TARGET_NAME} )
 
