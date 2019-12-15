@@ -79,34 +79,150 @@ struct RenderSettings {
 	float scale;
 	int width;
 	int height;
+	float fov;
 	
 	float idealFps;
 	int seqFrames;
 	
 	RenderSettings() {
-		origin = glm::vec3(0.974525452f, 71.9231415f, 0.0f);
+		origin = glm::vec3(0.0f, 72.0f, 0.0f);
 		scale = 1.0f;
 		seq = frame = 0;
+		fov = 65.0f;
 	}
 };
 
+glm::vec3 frustumCorners[8];
+
+glm::vec3 getFrustumDimensionsAtPos(RenderSettings& settings, glm::vec3 pos) {
+	// https://stackoverflow.com/questions/33436963/most-accurate-way-to-calculate-view-frustum-corners-in-world-space
+	float mFOV = settings.fov*0.5f;
+	float mNear = 1.0f;
+	float mFar = 1024;
+	float mRatio = (float)settings.width / (float)settings.height;
+	glm::vec3 mPos = settings.origin * -1.0f;
+	//mPos.z = 0;
+	//mPos.y = -76;
+	//mPos.x = -mPos.z + 0.2f;
+	glm::vec3 mUp(1, 0, 0);
+	glm::vec3 mFront(0, 1, 0);
+	glm::vec3 mRight(0, 0, 1);
+	
+	float nearHeight = 2 * tan(mFOV / 2.0f) * mNear;
+	float nearWidth = nearHeight * mRatio;
+
+	float farHeight = 2 * tan(mFOV / 2.0f) * mFar;
+	float farWidth = farHeight * mRatio;
+
+	glm::vec3 fc = mPos + mFront * mFar;
+	glm::vec3 nc = mPos + mFront * mNear;
+
+	frustumCorners[0] = nc + (mUp * (nearHeight / 2.0f)) - (mRight * (nearWidth / 2.0f));
+	frustumCorners[1] = nc + (mUp * (nearHeight / 2.0f)) + (mRight * (nearWidth / 2.0f));
+	frustumCorners[2] = nc - (mUp * (nearHeight / 2.0f)) - (mRight * (nearWidth / 2.0f));
+	frustumCorners[3] = nc - (mUp * (nearHeight / 2.0f)) + (mRight * (nearWidth / 2.0f));
+	
+	frustumCorners[4] = fc + (mUp * farHeight / 2.0f) - (mRight * farWidth / 2.0f);
+	frustumCorners[5] = fc + (mUp * farHeight / 2.0f) + (mRight * farWidth / 2.0f);
+	frustumCorners[6] = fc - (mUp * farHeight / 2.0f) - (mRight * farWidth / 2.0f);
+	frustumCorners[7] = fc - (mUp * farHeight / 2.0f) + (mRight * farWidth / 2.0f);
+	
+	/*
+	printf("\nFrustrum corners:\n");
+	for (int i = 0; i < 8; i++) {
+		printf("[%i] = (%.2f, %.2f, %.2f)\n", i, frustumCorners[i].x, frustumCorners[i].y, frustumCorners[i].z);
+	}
+	*/
+	
+	float near = frustumCorners[0].y;
+	float far = frustumCorners[4].y;
+	nearHeight = frustumCorners[0].x - frustumCorners[2].x;
+	nearWidth = -(frustumCorners[0].z - frustumCorners[1].z);
+	farHeight = frustumCorners[4].x - frustumCorners[6].x;
+	farWidth = -(frustumCorners[4].z - frustumCorners[5].z);
+	
+	//printf("Near height: %.2f\n", nearHeight);
+	//printf("Far height: %.2f\n", farHeight);
+	
+	
+	float distance = (near-(-pos.y)) / (near-far); // 0-1 where 1 is touching the far plane
+	//printf("Distance: %.2f\n", distance);
+	
+	float posWidth = nearWidth + (farWidth-nearWidth)*distance;
+	float posHeight = nearHeight + (farHeight-nearHeight)*distance;
+	
+	return glm::vec3(posWidth, posHeight, 0);
+}
+
+void draw_cube(glm::vec3 min, glm::vec3 max) {
+	glm::vec3 v1 = glm::vec3(min.x, min.y, min.z);
+	glm::vec3 v2 = glm::vec3(max.x, min.y, min.z);
+	glm::vec3 v3 = glm::vec3(max.x, max.y, min.z);
+	glm::vec3 v4 = glm::vec3(min.x, max.y, min.z);
+	
+	
+	glm::vec3 v5 = glm::vec3(min.x, min.y, max.z);
+	glm::vec3 v6 = glm::vec3(max.x, min.y, max.z);
+	glm::vec3 v7 = glm::vec3(max.x, max.y, max.z);
+	glm::vec3 v8 = glm::vec3(min.x, max.y, max.z);
+	
+	
+	glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+	glDisable( GL_TEXTURE_2D );
+	glDisable( GL_CULL_FACE );
+	glDisable( GL_DEPTH_BUFFER );
+	glBegin(GL_LINE_STRIP);		
+		glColor3f( 1, 0, 0 ); glVertex3f(v1.x, v1.y, v1.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v2.x, v2.y, v2.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v3.x, v3.y, v3.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v4.x, v4.y, v4.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v1.x, v1.y, v1.z);
+	glEnd();
+
+	glBegin(GL_LINE_STRIP);	
+		glColor3f( 1, 0, 0 ); glVertex3f(v5.x, v5.y, v5.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v6.x, v6.y, v6.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v7.x, v7.y, v7.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v8.x, v8.y, v8.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v5.x, v5.y, v5.z);
+	glEnd();
+	
+	glBegin(GL_LINES);	
+		glColor3f( 1, 0, 0 ); glVertex3f(v1.x, v1.y, v1.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v5.x, v5.y, v5.z);
+		
+		glColor3f( 1, 0, 0 ); glVertex3f(v2.x, v2.y, v2.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v6.x, v6.y, v6.z);
+		
+		glColor3f( 1, 0, 0 ); glVertex3f(v3.x, v3.y, v3.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v7.x, v7.y, v7.z);
+		
+		glColor3f( 1, 0, 0 ); glVertex3f(v4.x, v4.y, v4.z);
+		glColor3f( 1, 0, 0 ); glVertex3f(v8.x, v8.y, v8.z);
+	glEnd();
+}
+
+
 static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, bool extentOnly=false)
 {
-	float flFOV = 65.0f;
 	bool backfaceCulling = true;
 	//RenderMode renderMode = RenderMode::TEXTURE_SHADED;
 	RenderMode renderMode = RenderMode::TEXTURE_SHADED;
 	
+	auto mat = Mat4x4ModelView();
+	
 	if (!extentOnly) {
 		//glClearColor( 63.0f / 255.0f, 127.0f / 255.0f, 127.0f / 255.0f, 1.0 );
-		glClearColor( 0,0,0, 0 );
+		glClearColor( 0.2,0.4,0.4,0 );
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 		glViewport( 0, 0, settings.width, settings.height );
 		
 		// set up projection
 		glMatrixMode( GL_PROJECTION );
 		glLoadIdentity();
-		gluPerspective( flFOV, ( GLfloat ) settings.width / ( GLfloat ) settings.height, 1.0f, 1 << 24 );
+		gluPerspective( settings.fov, ( GLfloat ) settings.width / ( GLfloat ) settings.height, 1.0f, 4096 );
+		
+		
 		
 		glMatrixMode( GL_MODELVIEW );
 		glPushMatrix();
@@ -116,7 +232,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, 
 		glm::vec3 origin = glm::vec3(-settings.origin.z, settings.origin.y, settings.origin.x);
 		glm::vec3 angles = glm::vec3(-90.0f, 0.0f, -90.0f);
 		const glm::mat4x4 identity = Mat4x4ModelView();
-		auto mat = Mat4x4ModelView();
+		//auto mat = Mat4x4ModelView();
 		mat = glm::translate(mat, -origin );
 		mat = glm::rotate(mat, glm::radians( angles[ 2 ] ), glm::vec3{ 1, 0, 0 } );
 		mat = glm::rotate(mat, glm::radians( angles[ 0 ] ), glm::vec3{ 0, 1, 0 } );
@@ -131,17 +247,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, 
 		mat2 = glm::rotate(mat2, glm::radians( angles[ 1 ] ), glm::vec3{ 0, 0, 1 } );
 		const auto vecAbsOrigin = glm::inverse( mat2 )[ 3 ];
 		g_pStudioMdlRenderer->SetViewerOrigin( glm::vec3( vecAbsOrigin ) );	
-	
-		/*
-		float fmodelview[16];
-		glGetFloatv(GL_MODELVIEW_MATRIX, fmodelview);
-		float fprojection[16];
-		glGetFloatv(GL_PROJECTION_MATRIX, fprojection);
-		glm::mat4 modelview = glm::mat4(fmodelview);
-		glm::mat4 projection = glm::mat4(fprojection);
-		//glm::vec3 frustrum_far_min = 
-		*/
-		
+
 		glm::vec3 angViewerDir = glm::vec3(90.0f, 0.0f, 90.0f);
 		angViewerDir = angViewerDir + 180.0f;
 		glm::vec3 vecViewerRight;
@@ -196,6 +302,44 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, 
 	
 	int drawnPolys = g_pStudioMdlRenderer->GetDrawnPolygonsCount();
 	
+	glm::vec3 min = g_pStudioMdlRenderer->m_drawnCoordMin;
+	glm::vec3 max = g_pStudioMdlRenderer->m_drawnCoordMax;
+	min *= -0.2f;
+	max *= -0.2f;
+	//glm::vec4 min4 = glm::vec4(min.y, min.x, min.z, 1.0f);
+	//glm::vec4 max4 = glm::vec4(max.y, max.x, max.z, 1.0f);
+	//min = glm::vec3(min.y, min.x, min.z);
+	//max = glm::vec3(max.y, max.x, max.z);
+	
+	glm::vec3 angles = glm::vec3(-90.0f, settings.angles.y, -90.0f);
+	
+	printf("Bounding box: (%f, %f, %f) (%f, %f, %f)\n", min.x, min.y, min.z, max.x, max.y, max.z);
+	
+	mat = Mat4x4ModelView();
+	mat = glm::rotate(mat, glm::radians( angles[ 2 ] ), glm::vec3{ 1, 0, 0 } );
+	mat = glm::rotate(mat, glm::radians( angles[ 0 ] ), glm::vec3{ 0, 1, 0 } );
+	mat = glm::rotate(mat, glm::radians( angles[ 1 ] ), glm::vec3{ 0, 0, 1 } );
+	mat = glm::translate(mat, min);
+	min = glm::vec3( mat[3] );
+	
+	mat = Mat4x4ModelView();
+	mat = glm::rotate(mat, glm::radians( angles[ 2 ] ), glm::vec3{ 1, 0, 0 } );
+	mat = glm::rotate(mat, glm::radians( angles[ 0 ] ), glm::vec3{ 0, 1, 0 } );
+	mat = glm::rotate(mat, glm::radians( angles[ 1 ] ), glm::vec3{ 0, 0, 1 } );
+	mat = glm::translate(mat, max);
+	max = glm::vec3( mat[3] );
+	
+	//min4 = (mat * min4);
+	//max4 = (mat * max4);
+	
+	//min4 = (min4 * mat);
+	//max4 = (max4 * mat);
+	
+	//min = glm::vec3(min4.x, min4.y, min4.z);
+	//max = glm::vec3(max4.x, max4.y, max4.z);
+	
+	draw_cube(min, max);
+	
 	if (!extentOnly)
 		glPopMatrix();
 }
@@ -216,9 +360,13 @@ void center_and_scale_model(RenderSettings& settings)
 	float maxZ = glm::max(fabs(extentMin.z), fabs(extentMax.z));
 	float maxDimH = glm::max(maxX, maxY);
 	float maxDimV = maxZ;
-	float idealMaxDimV = 36.0f; // magic usually-works frustrum height.
-	//float idealMaxDimH = idealMaxDimV * ((float)width/(float)height);
-	float idealMaxDimH = 22.5f;
+	
+	glm::vec3 frustumDims = getFrustumDimensionsAtPos(settings, max);
+	
+	//printf("Frustum dims at %.2f: (%.2f, %.2f)\n", min.y, frustumDims.x, frustumDims.y);
+	
+	float idealMaxDimH = frustumDims.x/2.0f;
+	float idealMaxDimV = frustumDims.y/2.0f;
 	float scaleV = idealMaxDimV / maxDimV;
 	float scaleH = idealMaxDimH / maxDimH;
 	float scale = glm::min(scaleV, scaleH);
@@ -230,8 +378,9 @@ void center_and_scale_model(RenderSettings& settings)
 	max *= scale;
 	center = min + (max - min)*0.5f;
 	
-	settings.origin = glm::vec3(0, 75.0f, center.z);
+	//settings.origin = glm::vec3(0, 72.0f, center.z);
 	settings.scale = scale;
+	settings.scale = 0.2f;
 }
 
 #ifdef EMSCRIPTEN
@@ -343,7 +492,7 @@ void em_loop() {
 	}
 	avgFramerate /= (float)framerates.size();
 
-	if (settings.seqFrames > 1) {
+	if (settings.seqFrames > 1 && false) {
 		settings.frame += settings.idealFps / framerate;
 		while (settings.frame >= settings.seqFrames-1) {
 			settings.frame -= (settings.seqFrames-1);
