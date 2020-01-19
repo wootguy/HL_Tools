@@ -983,19 +983,30 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 
 		int i;
 
+		const int MAX_VERTS_PER_CALL = 256;
+		static float vertexData[MAX_VERTS_PER_CALL*3];
+		static float texCoordData[MAX_VERTS_PER_CALL*2];
+		static float colorData[MAX_VERTS_PER_CALL * 4];
+		
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glEnableClientState(GL_COLOR_ARRAY);
+
 		while( i = *( ptricmds++ ) )
 		{
+			int drawMode = GL_TRIANGLE_STRIP;
 			if( i < 0 )
 			{
-				glBegin( GL_TRIANGLE_FAN );
 				i = -i;
-			}
-			else
-			{
-				glBegin( GL_TRIANGLE_STRIP );
+				drawMode = GL_TRIANGLE_FAN;
 			}
 
-			uiDrawnPolys += i - 2;
+			int polies = i - 2;
+			uiDrawnPolys += polies;
+
+			int texCoordIdx = 0;
+			int colorIdx = 0;
+			int vertexIdx = 0;
 
 			for( ; i > 0; i--, ptricmds += 4 )
 			{
@@ -1003,21 +1014,29 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 				{
 					if( texture.flags & STUDIO_NF_CHROME )
 					{
-						glTexCoord2f( m_chrome[ ptricmds[ 1 ] ][ 0 ] * s, m_chrome[ ptricmds[ 1 ] ][ 1 ] * t );
+						texCoordData[texCoordIdx++] = m_chrome[ptricmds[1]][0] * s;
+						texCoordData[texCoordIdx++] = m_chrome[ptricmds[1]][1] * t;
 					}
 					else
 					{
-						glTexCoord2f( ptricmds[ 2 ] * s, ptricmds[ 3 ] * t );
+						texCoordData[texCoordIdx++] = ptricmds[2] * s;
+						texCoordData[texCoordIdx++] = ptricmds[3] * t;
 					}
 
 					if( texture.flags & STUDIO_NF_ADDITIVE )
 					{
-						glColor4f( 1.0f, 1.0f, 1.0f, m_pRenderInfo->flTransparency );
+						colorData[colorIdx++] = 1.0f;
+						colorData[colorIdx++] = 1.0f;
+						colorData[colorIdx++] = 1.0f;
+						colorData[colorIdx++] = m_pRenderInfo->flTransparency;
 					}
 					else
 					{
 						const glm::vec3& lightVec = m_pvlightvalues[ ptricmds[ 1 ] ];
-						glColor4f( lightVec[ 0 ], lightVec[ 1 ], lightVec[ 2 ], m_pRenderInfo->flTransparency );
+						colorData[colorIdx++] = lightVec[0];
+						colorData[colorIdx++] = lightVec[1];
+						colorData[colorIdx++] = lightVec[2];
+						colorData[colorIdx++] = m_pRenderInfo->flTransparency;
 					}
 				}
 
@@ -1029,9 +1048,16 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 				if (vert.y > m_drawnCoordMax.y) m_drawnCoordMax.y = vert.y;
 				if (vert.z > m_drawnCoordMax.z) m_drawnCoordMax.z = vert.z;
 				
-				glVertex3fv( glm::value_ptr( vert ) );
+				vertexData[vertexIdx++] = vert.x;
+				vertexData[vertexIdx++] = vert.y;
+				vertexData[vertexIdx++] = vert.z;
 			}
-			glEnd();
+
+			glVertexPointer(3, GL_FLOAT, sizeof(float) * 3, vertexData);
+			glTexCoordPointer(2, GL_FLOAT, sizeof(float) * 2, texCoordData);
+			glColorPointer(4, GL_FLOAT, sizeof(float) * 4, colorData);
+
+			glDrawArrays(drawMode, 0, polies+2);
 		}
 
 		if( texture.flags & STUDIO_NF_MASKED )
