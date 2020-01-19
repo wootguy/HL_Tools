@@ -159,7 +159,7 @@ unsigned int CStudioModelRenderer::DrawModel( studiomdl::CModelRenderInfo* const
 		DrawEyePosition();
 	}
 
-	if( g_ShowHitboxes.GetBool() )
+	if( g_ShowHitboxes.GetBool() || true )
 	{
 		DrawHitBoxes();
 	}
@@ -372,18 +372,9 @@ void CStudioModelRenderer::DrawEyePosition()
 
 void CStudioModelRenderer::DrawHitBoxes()
 {
-	glDisable( GL_TEXTURE_2D );
-	glDisable( GL_CULL_FACE );
-	if( m_pRenderInfo->flTransparency < 1.0f )
-		glDisable( GL_DEPTH_TEST );
-	else
-		glEnable( GL_DEPTH_TEST );
-
-	glColor4f( 1, 0, 0, 0.5f );
-
-	glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-	glEnable( GL_BLEND );
-	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_CULL_FACE);
 
 	for( int i = 0; i < m_pStudioHdr->numhitboxes; i++ )
 	{
