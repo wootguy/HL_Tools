@@ -77,6 +77,7 @@ struct RenderSettings {
 	int seq;
 	float frame;
 	float scale;
+	float clipScale; // anything above this will clip the model at some point
 	int width;
 	int height;
 	float fov;
@@ -85,8 +86,10 @@ struct RenderSettings {
 	int seqFrames;
 	
 	RenderSettings() {
-		origin = glm::vec3(0.0f, 72.0f, 0.0f);
+		// middle point between near/far plane (TODO: Doesn't work with any other znear/zfar combo?)
+		origin = glm::vec3(0.0f, 63.5f, 0.0f);
 		scale = 1.0f;
+		clipScale = 1000.0f;
 		seq = frame = 0;
 		fov = 65.0f;
 	}
@@ -202,11 +205,133 @@ void draw_cube(glm::vec3 min, glm::vec3 max) {
 	glEnd();
 }
 
+void draw_line(glm::vec2 p1, glm::vec2 p2) {
+	glBegin(GL_LINES);
+		glColor3f(0.5f, 0, 1); glVertex3f(p1.x, 800 - p1.y, 0);
+		glColor3f(0.5f, 0, 1); glVertex3f(p2.x, 800 - p2.y, 0);
+	glEnd();
+}
 
-static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, bool extentOnly=false)
+glm::mat4x4 loadMatrix(int mtype) {
+	GLfloat model[16];
+	glGetFloatv(mtype, model);
+
+	glm::mat4x4 asdf;
+	for (int x = 0; x < 4; x++) {
+		for (int y = 0; y < 4; y++) {
+			asdf[y][x] = model[y * 4 + x];
+		}
+	}
+
+	return asdf;
+}
+
+
+// requires modelview/projection matrix to match the BBox of the object that was just drawn
+void getScreenSpaceBBox(glm::vec3 min, glm::vec3 max, glm::vec3& minScreen, glm::vec3& maxScreen, int screenHeight) {
+
+	glm::vec3 v[8] = {
+		glm::vec3(min.x, min.y, min.z),
+		glm::vec3(max.x, min.y, min.z),
+		glm::vec3(max.x, max.y, min.z),
+		glm::vec3(min.x, max.y, min.z),
+
+		glm::vec3(min.x, min.y, max.z),
+		glm::vec3(max.x, min.y, max.z),
+		glm::vec3(max.x, max.y, max.z),
+		glm::vec3(min.x, max.y, max.z)
+	};
+
+	GLfloat modelviewf[16];
+	GLfloat projectionf[16];
+	GLdouble modelview[16];
+	GLdouble projection[16];
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	glGetFloatv(GL_PROJECTION_MATRIX, projectionf);
+	glGetFloatv(GL_MODELVIEW_MATRIX, modelviewf);
+	for (int i = 0; i < 16; i++)
+	{
+		modelview[i] = modelviewf[i];
+		projection[i] = projectionf[i];
+	}
+
+	glm::mat4x4 modelviewmat = loadMatrix(GL_MODELVIEW_MATRIX);
+	glm::mat4x4 projectionmat = loadMatrix(GL_PROJECTION_MATRIX);
+	glm::mat4x4 mvp = projectionmat * modelviewmat;
+
+	int clipping = 0;
+	minScreen.x = 99999;
+	minScreen.y = 99999;
+	minScreen.z = 99999;
+	maxScreen.x = -99999;
+	maxScreen.y = -99999;
+	maxScreen.z = -99999;
+	for (int i = 0; i < 8; i++) {
+		GLdouble sx, sy, sz;
+		gluProject(v[i].x, v[i].y, v[i].z,
+			(const GLdouble*)&modelview[0], (const GLdouble*)&projection[0], viewport,
+			&sx, &sy, &sz);
+
+		glm::vec4 vv = glm::vec4(v[i].x, v[i].y, v[i].z, 1.0f);
+		glm::vec4 sv = mvp * vv;
+		glm::vec4 wv = modelviewmat * vv;
+		//glm::vec3 sv2 = glm::vec3(sv.x / sv.w, sv.y / sv.w, -(72.0f - (-wv.z)));
+		float depthRange = 128.0f - 1.0f;
+		//printf("DISTANCE: %.2f", -sv.z);
+		glm::vec3 sv2 = glm::vec3(sv.x / sv.w, sv.y / sv.w, ((-wv.z / depthRange)*2) - 1);
+		//glm::vec3 sv2 = glm::vec3(sv.x / sv.w, sv.y / sv.w, sv.z / sv.w);
+		//sv2.z *= sv2.z * sv2.z * sv2.z;
+		//sv2.x = (float)viewport[2] * (sv2.x + 1.0f) / 2.0f;
+		//sv2.y = (float)viewport[3] * (sv2.y + 1.0f) / 2.0f;
+
+		//if (wv.z < -144.0f)
+		//	printf("SCREEN SPACE: %.1f, %.1f, %.1f\n", wv.x, wv.y, wv.z);
+
+		//sv2.y = screenHeight - sv2.y;
+
+		if (sv2.x < minScreen.x) minScreen.x = sv2.x;
+		if (sv2.y < minScreen.y) minScreen.y = sv2.y;
+		if (sv2.z < minScreen.z) minScreen.z = sv2.z;
+		if (sv2.x > maxScreen.x) maxScreen.x = sv2.x;
+		if (sv2.y > maxScreen.y) maxScreen.y = sv2.y;
+		if (sv2.z > maxScreen.z) maxScreen.z = sv2.z;
+	}	
+}
+
+void center_and_scale_model(glm::vec3 min, glm::vec3 max, RenderSettings& settings)
+{
+	float maxScaleH = (1.0f / glm::max(fabs(min.x), fabs(max.x))) * settings.scale;
+	float maxScaleV = (1.0f / glm::max(fabs(min.y), fabs(max.y))) * settings.scale;
+	float maxScaleD = (0.5f / glm::max(fabs(min.z), fabs(max.z))) * settings.scale;
+
+	float scale = glm::min(glm::min(maxScaleH, maxScaleV), maxScaleD);
+
+	//printf("CLIP MIN: (%.2f, %.2f, %.2f), CLIP MAX: (%.2f, %.2f, %.2f), Scales: (%.3f, %.3f, %.3f)\n", 
+	//	min.x, min.y, min.z, max.x, max.y, max.z, maxScaleH, maxScaleV, maxScaleD);
+
+	//printf("Max extents: (%.1f, %.1f), Ideal extent: (%.1f, %.1f), scale: %.2f -> %.2f (%.2f), Z: %.1f, %.1f = %.2f\n", 
+	//	maxDimH, maxDimV, idealMaxDimH, idealMaxDimV, settings.scale, scale, settings.clipScale, min.z, max.z, scaleDepth);
+	//printf("SCALES: %.2f, %.2f, %.2f\n", scaleH, scaleV, scaleDepth);
+	//printf("Bounding box: (%.2f, %.2f) (%.2f, %.2f)\n", min.x, min.y, max.x, max.y);
+
+	if (settings.scale > scale) {
+		settings.clipScale = glm::min(settings.clipScale, scale);
+	}
+	settings.scale = glm::min(settings.clipScale, scale);
+
+	//settings.scale = scale;
+
+	float zmin = g_pStudioMdlRenderer->m_drawnCoordMin.z * settings.scale;
+	float zmax = g_pStudioMdlRenderer->m_drawnCoordMax.z * settings.scale;
+	settings.origin.z = (zmin + (zmax - zmin) * 0.5f);
+
+	//settings.scale = 0.05f;
+}
+
+static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings, bool extentOnly=false)
 {
 	bool backfaceCulling = true;
-	//RenderMode renderMode = RenderMode::TEXTURE_SHADED;
 	RenderMode renderMode = RenderMode::TEXTURE_SHADED;
 	
 	auto mat = Mat4x4ModelView();
@@ -220,9 +345,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, 
 		// set up projection
 		glMatrixMode( GL_PROJECTION );
 		glLoadIdentity();
-		gluPerspective( settings.fov, ( GLfloat ) settings.width / ( GLfloat ) settings.height, 1.0f, 4096 );
-		
-		
+		gluPerspective( settings.fov, ( GLfloat ) settings.width / ( GLfloat ) settings.height, 1.0f, 4096.0f);
 		
 		glMatrixMode( GL_MODELVIEW );
 		glPushMatrix();
@@ -230,7 +353,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, 
 		
 		// setup camera
 		glm::vec3 origin = glm::vec3(-settings.origin.z, settings.origin.y, settings.origin.x);
-		glm::vec3 angles = glm::vec3(-90.0f, 0.0f, -90.0f);
+		glm::vec3 angles = glm::vec3(-90.0f, settings.angles.y, -90.0f);
 		const glm::mat4x4 identity = Mat4x4ModelView();
 		//auto mat = Mat4x4ModelView();
 		mat = glm::translate(mat, -origin );
@@ -238,20 +361,16 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, 
 		mat = glm::rotate(mat, glm::radians( angles[ 0 ] ), glm::vec3{ 0, 1, 0 } );
 		mat = glm::rotate(mat, glm::radians( angles[ 1 ] ), glm::vec3{ 0, 0, 1 } );
 		glLoadMatrixf( (const GLfloat*)&mat[0] );
-		
+
 		// more camera maybe?
-		auto mat2 = Mat4x4ModelView();
-		mat2 = glm::translate(mat2, -origin );
-		mat2 = glm::rotate(mat2, glm::radians( angles[ 2 ] ), glm::vec3{ 1, 0, 0 } );
-		mat2 = glm::rotate(mat2, glm::radians( angles[ 0 ] ), glm::vec3{ 0, 1, 0 } );
-		mat2 = glm::rotate(mat2, glm::radians( angles[ 1 ] ), glm::vec3{ 0, 0, 1 } );
-		const auto vecAbsOrigin = glm::inverse( mat2 )[ 3 ];
+		const auto vecAbsOrigin = glm::inverse( mat )[ 3 ];
 		g_pStudioMdlRenderer->SetViewerOrigin( glm::vec3( vecAbsOrigin ) );	
 
 		glm::vec3 angViewerDir = glm::vec3(90.0f, 0.0f, 90.0f);
 		angViewerDir = angViewerDir + 180.0f;
 		glm::vec3 vecViewerRight;
 		
+
 		//We're using the up vector here since the in-game look can only be matched if chrome is rotated.
 		AngleVectors( angViewerDir, nullptr, nullptr, &vecViewerRight );
 		
@@ -274,7 +393,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, 
 		studiomdl::CModelRenderInfo renderInfo;
 
 		renderInfo.vecOrigin = glm::vec3(0,0,0);
-		renderInfo.vecAngles = settings.angles;
+		renderInfo.vecAngles = glm::vec3(0,0,0);//settings.angles;
 		renderInfo.vecScale = glm::vec3(settings.scale,settings.scale,settings.scale);
 
 		renderInfo.pModel = mdl;
@@ -301,86 +420,44 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings settings, 
 	}
 	
 	int drawnPolys = g_pStudioMdlRenderer->GetDrawnPolygonsCount();
-	
+
 	glm::vec3 min = g_pStudioMdlRenderer->m_drawnCoordMin;
 	glm::vec3 max = g_pStudioMdlRenderer->m_drawnCoordMax;
-	min *= -0.2f;
-	max *= -0.2f;
-	//glm::vec4 min4 = glm::vec4(min.y, min.x, min.z, 1.0f);
-	//glm::vec4 max4 = glm::vec4(max.y, max.x, max.z, 1.0f);
-	//min = glm::vec3(min.y, min.x, min.z);
-	//max = glm::vec3(max.y, max.x, max.z);
-	
-	glm::vec3 angles = glm::vec3(-90.0f, settings.angles.y, -90.0f);
-	
-	printf("Bounding box: (%f, %f, %f) (%f, %f, %f)\n", min.x, min.y, min.z, max.x, max.y, max.z);
-	
-	mat = Mat4x4ModelView();
-	mat = glm::rotate(mat, glm::radians( angles[ 2 ] ), glm::vec3{ 1, 0, 0 } );
-	mat = glm::rotate(mat, glm::radians( angles[ 0 ] ), glm::vec3{ 0, 1, 0 } );
-	mat = glm::rotate(mat, glm::radians( angles[ 1 ] ), glm::vec3{ 0, 0, 1 } );
-	mat = glm::translate(mat, min);
-	min = glm::vec3( mat[3] );
-	
-	mat = Mat4x4ModelView();
-	mat = glm::rotate(mat, glm::radians( angles[ 2 ] ), glm::vec3{ 1, 0, 0 } );
-	mat = glm::rotate(mat, glm::radians( angles[ 0 ] ), glm::vec3{ 0, 1, 0 } );
-	mat = glm::rotate(mat, glm::radians( angles[ 1 ] ), glm::vec3{ 0, 0, 1 } );
-	mat = glm::translate(mat, max);
-	max = glm::vec3( mat[3] );
-	
-	//min4 = (mat * min4);
-	//max4 = (mat * max4);
-	
-	//min4 = (min4 * mat);
-	//max4 = (max4 * mat);
-	
-	//min = glm::vec3(min4.x, min4.y, min4.z);
-	//max = glm::vec3(max4.x, max4.y, max4.z);
-	
+	min *= settings.scale;
+	max *= settings.scale;
+
+	glm::vec3 screenMin, screenMax;
+	getScreenSpaceBBox(min, max, screenMin, screenMax, settings.height);
 	draw_cube(min, max);
-	
+
+	// find screen space coords of bounding box
+
 	if (!extentOnly)
 		glPopMatrix();
-}
 
-void center_and_scale_model(RenderSettings& settings)
-{
-	// update camera to center and zoom on the model
-	glm::vec3 min = g_pStudioMdlRenderer->m_drawnCoordMin;
-	glm::vec3 max = g_pStudioMdlRenderer->m_drawnCoordMax;
-	glm::vec3 center = min + (max - min)*0.5f;
-	glm::vec3 extentMax = center - min;
-	glm::vec3 extentMin = max - center;
 	
-	// the idea is to calculate how big the model can be and still fit on the screen, but this isn't the way to do it.
-	// TODO: calculate bounding cylinder from model (rotated bounding box) and scale that to match the view frustrum height.
-	float maxX = glm::max(fabs(extentMin.x), fabs(extentMax.x));
-	float maxY = glm::max(fabs(extentMin.y), fabs(extentMax.y));
-	float maxZ = glm::max(fabs(extentMin.z), fabs(extentMax.z));
-	float maxDimH = glm::max(maxX, maxY);
-	float maxDimV = maxZ;
+	// draw 2d stuff
+	glViewport(0, 0, settings.width, settings.height);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, settings.width, 0, settings.height, -1, 1);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_DEPTH_BUFFER);
+
+	draw_line(glm::vec2(screenMin.x, screenMin.y), glm::vec2(screenMax.x, screenMax.y));
+	draw_line(glm::vec2(screenMax.x, screenMin.y), glm::vec2(screenMax.x, screenMax.y));
+	draw_line(glm::vec2(screenMin.x, screenMax.y), glm::vec2(screenMax.x, screenMax.y));
+	draw_line(glm::vec2(screenMin.x, screenMax.y), glm::vec2(screenMin.x, screenMin.y));
+
+	draw_line(glm::vec2(screenMin.x, screenMin.y), glm::vec2(screenMax.x, screenMax.y));
+	draw_line(glm::vec2(screenMax.x, screenMin.y), glm::vec2(screenMin.x, screenMax.y));
 	
-	glm::vec3 frustumDims = getFrustumDimensionsAtPos(settings, max);
-	
-	//printf("Frustum dims at %.2f: (%.2f, %.2f)\n", min.y, frustumDims.x, frustumDims.y);
-	
-	float idealMaxDimH = frustumDims.x/2.0f;
-	float idealMaxDimV = frustumDims.y/2.0f;
-	float scaleV = idealMaxDimV / maxDimV;
-	float scaleH = idealMaxDimH / maxDimH;
-	float scale = glm::min(scaleV, scaleH);
-	
-	//printf("Max extents: (%f, %f), Ideal extent: (%f, %f), scale: %f\n", maxDimV, maxDimH, idealMaxDimV, idealMaxDimH, scale);
-	//printf("Bounding box: (%f, %f, %f) (%f, %f, %f)\n", min.x, min.y, min.z, max.x, max.y, max.z);
-	
-	min *= scale;
-	max *= scale;
-	center = min + (max - min)*0.5f;
-	
-	//settings.origin = glm::vec3(0, 72.0f, center.z);
-	settings.scale = scale;
-	settings.scale = 0.2f;
+	center_and_scale_model(screenMin, screenMax, settings);
 }
 
 #ifdef EMSCRIPTEN
@@ -428,6 +505,7 @@ uint64 getSystemTime()
 uint64 lastFrameTime;
 std::deque<float> framerates;
 bool program_ready = false;
+bool calculating_size = false;
 
 
 void em_loop() {
@@ -447,17 +525,65 @@ void em_loop() {
 		if (mdl) delete mdl;
 		mdl = mdlTemp;
 		newModelReady = false;
-		g_pStudioMdlRenderer->m_drawnCoordMin = g_pStudioMdlRenderer->m_drawnCoordMax = glm::vec3(0,0,0);
+		calculating_size = true;
+		g_pStudioMdlRenderer->m_drawnCoordMin = glm::vec3(9e99, 9e99, 9e99);
+		g_pStudioMdlRenderer->m_drawnCoordMax = glm::vec3(-9e99,-9e99,-9e99);
 		
+		settings = RenderSettings();
+		settings.width = width;
+		settings.height = height;
+
 		studiohdr_t* header = mdl->GetStudioHeader();
 		settings.idealFps = header->GetSequence(0)->fps;
 		settings.seqFrames = header->GetSequence(0)->numframes;
 		printf("Sequence frames: %i, FPS: %f\n", header->GetSequence(0)->numframes, header->GetSequence(0)->fps);
 		
 		// calculate model size then render again to correct the camera position
-		em_loop(); settings.angles.y = 0;
-		em_loop(); settings.angles.y = 0;
+		settings.scale = 0.1f;
+		settings.clipScale = 99999;
+
+		float lastScale = 999999;
+		for (int i = 0; i < 16; i++) {
+			settings.angles.y = 0; em_loop(); settings.clipScale = 99999;
+
+			float max = glm::max(lastScale, settings.scale);
+			float min = glm::min(lastScale, settings.scale);
+			float delta = max / min;
+			printf("SCALE part%d: %.3f %.3f %.3f\n", i, settings.scale, lastScale, delta);
+			lastScale = settings.scale;
+			if (delta < 1.05f) { // less than 5% difference
+				printf("STABALIZED\n");
+				break;
+			}
+		}
 		
+		// pre-calculate scales for a few rotations to prevent the model scaling down a lot during the animation
+		for (int r = 0; r < 360; r += 90) {
+			//printf("RENDER AT %i\n", i);
+
+			for (int i = 0; i < 64; i++) {
+				settings.angles.y = r; em_loop();
+
+				float max = glm::max(lastScale, settings.scale);
+				float min = glm::min(lastScale, settings.scale);
+				float delta = max / min;
+				printf("SCALE rot %i part%d: %.3f %.3f %.3f\n", r, i, settings.scale, lastScale, delta);
+				lastScale = settings.scale;
+				if (delta < 1.05f) { // less than 5% difference
+					printf("STABALIZED\n");
+					break;
+				}
+				
+			}
+			settings.clipScale = glm::min(settings.clipScale, settings.scale);
+
+			//printf("SCALE part%i: %.2f %.2f\n", i+3, settings.scale, settings.origin.z);
+		}
+
+		settings.angles.y = 0;
+		
+		calculating_size = false;
+
 		// call js function to signal loading finished
 		EM_ASM(
 			hlms_model_load_complete(true);
@@ -492,23 +618,26 @@ void em_loop() {
 	}
 	avgFramerate /= (float)framerates.size();
 
-	if (settings.seqFrames > 1 && false) {
+	if (settings.seqFrames > 1 && !calculating_size) {
 		settings.frame += settings.idealFps / framerate;
 		while (settings.frame >= settings.seqFrames-1) {
 			settings.frame -= (settings.seqFrames-1);
 		}
-	}
-
-	settings.angles.y += 90.0f / framerate;
-	while (settings.angles.y > 360) {
-		settings.angles.y -= 360;
 	}
 	
 	//printf("Dat time: %.1f\n", avgFramerate);
 
 	render_model(mdl, settings);
 
-	center_and_scale_model(settings);
+	if (true) {
+		//settings.angles.y += 90.0f / framerate;
+		settings.angles.y += 60.0f / framerate;
+		while (settings.angles.y > 360) {
+			settings.angles.y -= 360;
+		}
+	}
+
+	//center_and_scale_model(settings);
 }
 
 bool file_exists(std::string fpath) {
@@ -795,7 +924,7 @@ int main( int argc, char *argv[] )
 	printf("DONE\n");
 	
 	// now that we know how much space the model uses, draw again with a centered camera and create the images
-	center_and_scale_model(settings);
+	//center_and_scale_model(settings);
 		
 	settings.angles = glm::vec3(0,0,0);
 	for (int i = 0; i < frames; i++) {
