@@ -242,20 +242,6 @@ void getScreenSpaceBBox(glm::vec3 min, glm::vec3 max, glm::vec3& minScreen, glm:
 		glm::vec3(min.x, max.y, max.z)
 	};
 
-	GLfloat modelviewf[16];
-	GLfloat projectionf[16];
-	GLdouble modelview[16];
-	GLdouble projection[16];
-	GLint viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-	glGetFloatv(GL_PROJECTION_MATRIX, projectionf);
-	glGetFloatv(GL_MODELVIEW_MATRIX, modelviewf);
-	for (int i = 0; i < 16; i++)
-	{
-		modelview[i] = modelviewf[i];
-		projection[i] = projectionf[i];
-	}
-
 	glm::mat4x4 modelviewmat = loadMatrix(GL_MODELVIEW_MATRIX);
 	glm::mat4x4 projectionmat = loadMatrix(GL_PROJECTION_MATRIX);
 	glm::mat4x4 mvp = projectionmat * modelviewmat;
@@ -268,27 +254,11 @@ void getScreenSpaceBBox(glm::vec3 min, glm::vec3 max, glm::vec3& minScreen, glm:
 	maxScreen.y = -99999;
 	maxScreen.z = -99999;
 	for (int i = 0; i < 8; i++) {
-		GLdouble sx, sy, sz;
-		gluProject(v[i].x, v[i].y, v[i].z,
-			(const GLdouble*)&modelview[0], (const GLdouble*)&projection[0], viewport,
-			&sx, &sy, &sz);
-
 		glm::vec4 vv = glm::vec4(v[i].x, v[i].y, v[i].z, 1.0f);
 		glm::vec4 sv = mvp * vv;
 		glm::vec4 wv = modelviewmat * vv;
-		//glm::vec3 sv2 = glm::vec3(sv.x / sv.w, sv.y / sv.w, -(72.0f - (-wv.z)));
 		float depthRange = 128.0f - 1.0f;
-		//printf("DISTANCE: %.2f", -sv.z);
 		glm::vec3 sv2 = glm::vec3(sv.x / sv.w, sv.y / sv.w, ((-wv.z / depthRange)*2) - 1);
-		//glm::vec3 sv2 = glm::vec3(sv.x / sv.w, sv.y / sv.w, sv.z / sv.w);
-		//sv2.z *= sv2.z * sv2.z * sv2.z;
-		//sv2.x = (float)viewport[2] * (sv2.x + 1.0f) / 2.0f;
-		//sv2.y = (float)viewport[3] * (sv2.y + 1.0f) / 2.0f;
-
-		//if (wv.z < -144.0f)
-		//	printf("SCREEN SPACE: %.1f, %.1f, %.1f\n", wv.x, wv.y, wv.z);
-
-		//sv2.y = screenHeight - sv2.y;
 
 		if (sv2.x < minScreen.x) minScreen.x = sv2.x;
 		if (sv2.y < minScreen.y) minScreen.y = sv2.y;
@@ -309,11 +279,6 @@ void center_and_scale_model(glm::vec3 min, glm::vec3 max, RenderSettings& settin
 
 	//printf("CLIP MIN: (%.2f, %.2f, %.2f), CLIP MAX: (%.2f, %.2f, %.2f), Scales: (%.3f, %.3f, %.3f)\n", 
 	//	min.x, min.y, min.z, max.x, max.y, max.z, maxScaleH, maxScaleV, maxScaleD);
-
-	//printf("Max extents: (%.1f, %.1f), Ideal extent: (%.1f, %.1f), scale: %.2f -> %.2f (%.2f), Z: %.1f, %.1f = %.2f\n", 
-	//	maxDimH, maxDimV, idealMaxDimH, idealMaxDimV, settings.scale, scale, settings.clipScale, min.z, max.z, scaleDepth);
-	//printf("SCALES: %.2f, %.2f, %.2f\n", scaleH, scaleV, scaleDepth);
-	//printf("Bounding box: (%.2f, %.2f) (%.2f, %.2f)\n", min.x, min.y, max.x, max.y);
 
 	if (settings.scale > scale) {
 		settings.clipScale = glm::min(settings.clipScale, scale);
@@ -434,28 +399,6 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings,
 
 	if (!extentOnly)
 		glPopMatrix();
-
-	
-	// draw 2d stuff
-	glViewport(0, 0, settings.width, settings.height);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(0, settings.width, 0, settings.height, -1, 1);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_CULL_FACE);
-	glDisable(GL_DEPTH_BUFFER);
-
-	draw_line(glm::vec2(screenMin.x, screenMin.y), glm::vec2(screenMax.x, screenMax.y));
-	draw_line(glm::vec2(screenMax.x, screenMin.y), glm::vec2(screenMax.x, screenMax.y));
-	draw_line(glm::vec2(screenMin.x, screenMax.y), glm::vec2(screenMax.x, screenMax.y));
-	draw_line(glm::vec2(screenMin.x, screenMax.y), glm::vec2(screenMin.x, screenMin.y));
-
-	draw_line(glm::vec2(screenMin.x, screenMin.y), glm::vec2(screenMax.x, screenMax.y));
-	draw_line(glm::vec2(screenMax.x, screenMin.y), glm::vec2(screenMin.x, screenMax.y));
 	
 	center_and_scale_model(screenMin, screenMax, settings);
 }
