@@ -983,7 +983,8 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 
 		int i;
 
-		const int MAX_VERTS_PER_CALL = 256;
+		const int MAX_TRIS_PER_BODYGROUP = 4080;
+		const int MAX_VERTS_PER_CALL = MAX_TRIS_PER_BODYGROUP*3;
 		static float vertexData[MAX_VERTS_PER_CALL*3];
 		static float texCoordData[MAX_VERTS_PER_CALL*2];
 		static float colorData[MAX_VERTS_PER_CALL * 4];
@@ -992,7 +993,13 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 		glEnableClientState(GL_COLOR_ARRAY);
 
-		while( i = *( ptricmds++ ) )
+		int totalElements = 0;
+		int texCoordIdx = 0;
+		int colorIdx = 0;
+		int vertexIdx = 0;
+		int stripIdx = 0;
+
+		while ( i = *( ptricmds++ ) )
 		{
 			int drawMode = GL_TRIANGLE_STRIP;
 			if( i < 0 )
@@ -1004,13 +1011,81 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 			int polies = i - 2;
 			uiDrawnPolys += polies;
 
-			int texCoordIdx = 0;
-			int colorIdx = 0;
-			int vertexIdx = 0;
+			int elementsThisStrip = 0;
+			int fanStartVertIdx = vertexIdx;
+			int fanStartTexIdx = texCoordIdx;
+			int fanStartColorIdx = colorIdx;
 
 			for( ; i > 0; i--, ptricmds += 4 )
 			{
-				if( !bWireframe )
+				if (elementsThisStrip++ >= 3) { // first 3 verts are always the first triangle
+					// convert to GL_TRIANGLES
+					if (drawMode == GL_TRIANGLE_STRIP) {
+						int v1PosIdx = vertexIdx - 3 * 2;
+						int v2PosIdx = vertexIdx - 3 * 1;
+						int v1TexIdx = texCoordIdx - 2 * 2;
+						int v2TexIdx = texCoordIdx - 2 * 1;
+						int v1ColorIdx = colorIdx - 4 * 2;
+						int v2ColorIdx = colorIdx - 4 * 1;
+
+						texCoordData[texCoordIdx++] = texCoordData[v1TexIdx];
+						texCoordData[texCoordIdx++] = texCoordData[v1TexIdx + 1];
+						colorData[colorIdx++] = colorData[v1ColorIdx];
+						colorData[colorIdx++] = colorData[v1ColorIdx + 1];
+						colorData[colorIdx++] = colorData[v1ColorIdx + 2];
+						colorData[colorIdx++] = colorData[v1ColorIdx + 3];
+						vertexData[vertexIdx++] = vertexData[v1PosIdx];
+						vertexData[vertexIdx++] = vertexData[v1PosIdx + 1];
+						vertexData[vertexIdx++] = vertexData[v1PosIdx + 2];
+
+						texCoordData[texCoordIdx++] = texCoordData[v2TexIdx];
+						texCoordData[texCoordIdx++] = texCoordData[v2TexIdx + 1];
+						colorData[colorIdx++] = colorData[v2ColorIdx];
+						colorData[colorIdx++] = colorData[v2ColorIdx + 1];
+						colorData[colorIdx++] = colorData[v2ColorIdx + 2];
+						colorData[colorIdx++] = colorData[v2ColorIdx + 3];
+						vertexData[vertexIdx++] = vertexData[v2PosIdx];
+						vertexData[vertexIdx++] = vertexData[v2PosIdx + 1];
+						vertexData[vertexIdx++] = vertexData[v2PosIdx + 2];
+
+						totalElements += 2;
+						elementsThisStrip += 2;
+
+					}
+					else if (drawMode == GL_TRIANGLE_FAN) {
+						int v1PosIdx = fanStartVertIdx;
+						int v2PosIdx = vertexIdx - 3 * 1;
+						int v1TexIdx = fanStartTexIdx;
+						int v2TexIdx = texCoordIdx - 2 * 1;
+						int v1ColorIdx = fanStartColorIdx;
+						int v2ColorIdx = colorIdx - 4 * 1;
+
+						texCoordData[texCoordIdx++] = texCoordData[v1TexIdx];
+						texCoordData[texCoordIdx++] = texCoordData[v1TexIdx + 1];
+						colorData[colorIdx++] = colorData[v1ColorIdx];
+						colorData[colorIdx++] = colorData[v1ColorIdx + 1];
+						colorData[colorIdx++] = colorData[v1ColorIdx + 2];
+						colorData[colorIdx++] = colorData[v1ColorIdx + 3];
+						vertexData[vertexIdx++] = vertexData[v1PosIdx];
+						vertexData[vertexIdx++] = vertexData[v1PosIdx + 1];
+						vertexData[vertexIdx++] = vertexData[v1PosIdx + 2];
+
+						texCoordData[texCoordIdx++] = texCoordData[v2TexIdx];
+						texCoordData[texCoordIdx++] = texCoordData[v2TexIdx + 1];
+						colorData[colorIdx++] = colorData[v2ColorIdx];
+						colorData[colorIdx++] = colorData[v2ColorIdx + 1];
+						colorData[colorIdx++] = colorData[v2ColorIdx + 2];
+						colorData[colorIdx++] = colorData[v2ColorIdx + 3];
+						vertexData[vertexIdx++] = vertexData[v2PosIdx];
+						vertexData[vertexIdx++] = vertexData[v2PosIdx + 1];
+						vertexData[vertexIdx++] = vertexData[v2PosIdx + 2];
+
+						totalElements += 2;
+						elementsThisStrip += 2;
+					}
+				}
+
+				if ( !bWireframe )
 				{
 					if( texture.flags & STUDIO_NF_CHROME )
 					{
@@ -1051,16 +1126,51 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 				vertexData[vertexIdx++] = vert.x;
 				vertexData[vertexIdx++] = vert.y;
 				vertexData[vertexIdx++] = vert.z;
+
+				totalElements++;
 			}
 
-			glVertexPointer(3, GL_FLOAT, sizeof(float) * 3, vertexData);
-			glTexCoordPointer(2, GL_FLOAT, sizeof(float) * 2, texCoordData);
-			glColorPointer(4, GL_FLOAT, sizeof(float) * 4, colorData);
 
-			glDrawArrays(drawMode, 0, polies+2);
+
+			// flip odd tris in strips (simpler than adding special logic when creating the arrays, and index buffers
+			// (for glDrawElements) don't seem to work with emscripten.
+			if (drawMode == GL_TRIANGLE_STRIP) {
+				for (int p = 1; p < polies; p += 2) {
+					int polyOffset = p * 3;
+
+					for (int k = 0; k < 3; k++)
+					{
+						int vstart = polyOffset*3 + fanStartVertIdx + k;
+						float t = vertexData[vstart];
+						vertexData[vstart] = vertexData[vstart + 3];
+						vertexData[vstart + 3] = t;
+					}
+					for (int k = 0; k < 2; k++)
+					{
+						int vstart = polyOffset*2 + fanStartTexIdx + k;
+						float t = texCoordData[vstart];
+						texCoordData[vstart] = texCoordData[vstart + 2];
+						texCoordData[vstart + 2] = t;
+					}
+					for (int k = 0; k < 4; k++)
+					{
+						int vstart = polyOffset*4 + fanStartColorIdx + k;
+						float t = colorData[vstart];
+						colorData[vstart] = colorData[vstart + 4];
+						colorData[vstart + 4] = t;
+					}
+				}
+			}
 		}
 
-		if( texture.flags & STUDIO_NF_MASKED )
+		glVertexPointer(3, GL_FLOAT, sizeof(float) * 3, vertexData);
+		glTexCoordPointer(2, GL_FLOAT, sizeof(float) * 2, texCoordData);
+		glColorPointer(4, GL_FLOAT, sizeof(float) * 4, colorData);
+
+		glDrawArrays(GL_TRIANGLES, 0, totalElements);
+
+
+		if ( texture.flags & STUDIO_NF_MASKED )
 			glDisable( GL_ALPHA_TEST );
 	}
 
