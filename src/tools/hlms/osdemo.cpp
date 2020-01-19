@@ -303,7 +303,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings,
 	
 	if (!extentOnly) {
 		//glClearColor( 63.0f / 255.0f, 127.0f / 255.0f, 127.0f / 255.0f, 1.0 );
-		glClearColor( 0.2,0.4,0.4,0 );
+		glClearColor( 0.2,0.4,0.4, 1.0f );
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 		glViewport( 0, 0, settings.width, settings.height );
 		

@@ -159,7 +159,7 @@ unsigned int CStudioModelRenderer::DrawModel( studiomdl::CModelRenderInfo* const
 		DrawEyePosition();
 	}
 
-	if( g_ShowHitboxes.GetBool() || true )
+	if( g_ShowHitboxes.GetBool() )
 	{
 		DrawHitBoxes();
 	}
@@ -974,6 +974,12 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 		{
 			glEnable( GL_ALPHA_TEST );
 			glAlphaFunc( GL_GREATER, 0.5f );
+
+			// emscripten doesn't support GL_ALPHA_TEST and this looks better than nothing
+			#ifdef EMSCRIPTEN
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			#endif
 		}
 
 		if( !bWireframe )
@@ -983,7 +989,7 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 
 		int i;
 
-		const int MAX_TRIS_PER_BODYGROUP = 4080;
+		const int MAX_TRIS_PER_BODYGROUP = 4080*2; // max is actually 4080 but 40k_sisters_Tenshi overflows somehow
 		const int MAX_VERTS_PER_CALL = MAX_TRIS_PER_BODYGROUP*3;
 		static float vertexData[MAX_VERTS_PER_CALL*3];
 		static float texCoordData[MAX_VERTS_PER_CALL*2];
@@ -1166,6 +1172,10 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 		glVertexPointer(3, GL_FLOAT, sizeof(float) * 3, vertexData);
 		glTexCoordPointer(2, GL_FLOAT, sizeof(float) * 2, texCoordData);
 		glColorPointer(4, GL_FLOAT, sizeof(float) * 4, colorData);
+
+		if (totalElements >= MAX_VERTS_PER_CALL) {
+			printf("VERTEX OVERFLOW: %i / %i\n", totalElements, MAX_VERTS_PER_CALL);
+		}
 
 		glDrawArrays(GL_TRIANGLES, 0, totalElements);
 
