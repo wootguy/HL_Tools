@@ -124,25 +124,43 @@ void SetProjection( const float flFOV, const int iWidth, const int iHeight )
 
 void DrawBox( const glm::vec3* const v )
 {
-	glBegin( GL_QUAD_STRIP );
-	for( int i = 0; i < 10; ++i )
-	{
-		glVertex3fv( glm::value_ptr( v[ i & 7 ] ) );
-	}
+	glm::vec3 v1 = v[1];
+	glm::vec3 v2 = v[3];
+	glm::vec3 v3 = v[2];
+	glm::vec3 v4 = v[0];
+	glm::vec3 v5 = v[7];
+	glm::vec3 v6 = v[5];
+	glm::vec3 v7 = v[4];
+	glm::vec3 v8 = v[6];
+
+	glBegin(GL_LINE_STRIP);
+	glColor3f(1, 0, 0); glVertex3f(v1.x, v1.y, v1.z);
+	glColor3f(1, 0, 0); glVertex3f(v2.x, v2.y, v2.z);
+	glColor3f(1, 0, 0); glVertex3f(v3.x, v3.y, v3.z);
+	glColor3f(1, 0, 0); glVertex3f(v4.x, v4.y, v4.z);
+	glColor3f(1, 0, 0); glVertex3f(v1.x, v1.y, v1.z);
 	glEnd();
 
-	glBegin( GL_QUAD_STRIP );
-	glVertex3fv( glm::value_ptr( v[ 6 ] ) );
-	glVertex3fv( glm::value_ptr( v[ 0 ] ) );
-	glVertex3fv( glm::value_ptr( v[ 4 ] ) );
-	glVertex3fv( glm::value_ptr( v[ 2 ] ) );
+	glBegin(GL_LINE_STRIP);
+	glColor3f(1, 0, 0); glVertex3f(v5.x, v5.y, v5.z);
+	glColor3f(1, 0, 0); glVertex3f(v6.x, v6.y, v6.z);
+	glColor3f(1, 0, 0); glVertex3f(v7.x, v7.y, v7.z);
+	glColor3f(1, 0, 0); glVertex3f(v8.x, v8.y, v8.z);
+	glColor3f(1, 0, 0); glVertex3f(v5.x, v5.y, v5.z);
 	glEnd();
 
-	glBegin( GL_QUAD_STRIP );
-	glVertex3fv( glm::value_ptr( v[ 1 ] ) );
-	glVertex3fv( glm::value_ptr( v[ 7 ] ) );
-	glVertex3fv( glm::value_ptr( v[ 3 ] ) );
-	glVertex3fv( glm::value_ptr( v[ 5 ] ) );
+	glBegin(GL_LINES);
+	glColor3f(1, 0, 0); glVertex3f(v1.x, v1.y, v1.z);
+	glColor3f(1, 0, 0); glVertex3f(v5.x, v5.y, v5.z);
+
+	glColor3f(1, 0, 0); glVertex3f(v2.x, v2.y, v2.z);
+	glColor3f(1, 0, 0); glVertex3f(v6.x, v6.y, v6.z);
+
+	glColor3f(1, 0, 0); glVertex3f(v3.x, v3.y, v3.z);
+	glColor3f(1, 0, 0); glVertex3f(v7.x, v7.y, v7.z);
+
+	glColor3f(1, 0, 0); glVertex3f(v4.x, v4.y, v4.z);
+	glColor3f(1, 0, 0); glVertex3f(v8.x, v8.y, v8.z);
 	glEnd();
 }
 }
