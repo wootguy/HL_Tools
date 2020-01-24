@@ -95,68 +95,6 @@ struct RenderSettings {
 	}
 };
 
-glm::vec3 frustumCorners[8];
-
-glm::vec3 getFrustumDimensionsAtPos(RenderSettings& settings, glm::vec3 pos) {
-	// https://stackoverflow.com/questions/33436963/most-accurate-way-to-calculate-view-frustum-corners-in-world-space
-	float mFOV = settings.fov*0.5f;
-	float mNear = 1.0f;
-	float mFar = 1024;
-	float mRatio = (float)settings.width / (float)settings.height;
-	glm::vec3 mPos = settings.origin * -1.0f;
-	//mPos.z = 0;
-	//mPos.y = -76;
-	//mPos.x = -mPos.z + 0.2f;
-	glm::vec3 mUp(1, 0, 0);
-	glm::vec3 mFront(0, 1, 0);
-	glm::vec3 mRight(0, 0, 1);
-	
-	float nearHeight = 2 * tan(mFOV / 2.0f) * mNear;
-	float nearWidth = nearHeight * mRatio;
-
-	float farHeight = 2 * tan(mFOV / 2.0f) * mFar;
-	float farWidth = farHeight * mRatio;
-
-	glm::vec3 fc = mPos + mFront * mFar;
-	glm::vec3 nc = mPos + mFront * mNear;
-
-	frustumCorners[0] = nc + (mUp * (nearHeight / 2.0f)) - (mRight * (nearWidth / 2.0f));
-	frustumCorners[1] = nc + (mUp * (nearHeight / 2.0f)) + (mRight * (nearWidth / 2.0f));
-	frustumCorners[2] = nc - (mUp * (nearHeight / 2.0f)) - (mRight * (nearWidth / 2.0f));
-	frustumCorners[3] = nc - (mUp * (nearHeight / 2.0f)) + (mRight * (nearWidth / 2.0f));
-	
-	frustumCorners[4] = fc + (mUp * farHeight / 2.0f) - (mRight * farWidth / 2.0f);
-	frustumCorners[5] = fc + (mUp * farHeight / 2.0f) + (mRight * farWidth / 2.0f);
-	frustumCorners[6] = fc - (mUp * farHeight / 2.0f) - (mRight * farWidth / 2.0f);
-	frustumCorners[7] = fc - (mUp * farHeight / 2.0f) + (mRight * farWidth / 2.0f);
-	
-	/*
-	printf("\nFrustrum corners:\n");
-	for (int i = 0; i < 8; i++) {
-		printf("[%i] = (%.2f, %.2f, %.2f)\n", i, frustumCorners[i].x, frustumCorners[i].y, frustumCorners[i].z);
-	}
-	*/
-	
-	float near = frustumCorners[0].y;
-	float far = frustumCorners[4].y;
-	nearHeight = frustumCorners[0].x - frustumCorners[2].x;
-	nearWidth = -(frustumCorners[0].z - frustumCorners[1].z);
-	farHeight = frustumCorners[4].x - frustumCorners[6].x;
-	farWidth = -(frustumCorners[4].z - frustumCorners[5].z);
-	
-	//printf("Near height: %.2f\n", nearHeight);
-	//printf("Far height: %.2f\n", farHeight);
-	
-	
-	float distance = (near-(-pos.y)) / (near-far); // 0-1 where 1 is touching the far plane
-	//printf("Distance: %.2f\n", distance);
-	
-	float posWidth = nearWidth + (farWidth-nearWidth)*distance;
-	float posHeight = nearHeight + (farHeight-nearHeight)*distance;
-	
-	return glm::vec3(posWidth, posHeight, 0);
-}
-
 void draw_cube(glm::vec3 min, glm::vec3 max) {
 	glm::vec3 v1 = glm::vec3(min.x, min.y, min.z);
 	glm::vec3 v2 = glm::vec3(max.x, min.y, min.z);
@@ -526,6 +464,7 @@ void em_loop() {
 		
 		precalculate_model_size(mdl, settings);
 
+		lastFrameTime = emscripten_get_now();
 		settings.angles.y = 0;
 		
 		calculating_size = false;
@@ -641,6 +580,15 @@ extern "C" {
 	
 	EMSCRIPTEN_KEEPALIVE void unload_model() {
 		shouldUnloadCurrentModel = true;
+	}
+
+	EMSCRIPTEN_KEEPALIVE void update_viewport(int newWidth, int newHeight) {
+		width = newWidth;
+		height = newHeight;
+		settings.width = width;
+		settings.height = height;
+		glfwSetWindowSize(width, height);
+		printf("Viewport resized: %dx%d\n", width, height);
 	}
 }
 
