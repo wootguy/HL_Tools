@@ -303,7 +303,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings,
 	
 	if (!extentOnly) {
 		//glClearColor( 63.0f / 255.0f, 127.0f / 255.0f, 127.0f / 255.0f, 1.0 );
-		glClearColor( 0.2,0.4,0.4, 1.0f );
+		glClearColor( 0.2,0.4,0.4,0 );
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 		glViewport( 0, 0, settings.width, settings.height );
 		
@@ -393,7 +393,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings,
 
 	glm::vec3 screenMin, screenMax;
 	getScreenSpaceBBox(min, max, screenMin, screenMax, settings.height);
-	draw_cube(min, max);
+	//draw_cube(min, max);
 
 	// find screen space coords of bounding box
 
@@ -401,6 +401,49 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings,
 		glPopMatrix();
 	
 	center_and_scale_model(screenMin, screenMax, settings);
+}
+
+static void precalculate_model_size(studiomdl::CStudioModel* mdl, RenderSettings& settings) {
+	// calculate model size then render again to correct the camera position
+	settings.scale = 0.1f;
+	settings.clipScale = 99999;
+
+	float lastScale = 999999;
+	for (int i = 0; i < 16; i++) {
+		settings.angles.y = 0; render_model(mdl, settings); settings.clipScale = 99999;
+
+		float max = glm::max(lastScale, settings.scale);
+		float min = glm::min(lastScale, settings.scale);
+		float delta = max / min;
+		printf("SCALE part%d: %.3f %.3f %.3f\n", i, settings.scale, lastScale, delta);
+		lastScale = settings.scale;
+		if (delta < 1.05f) { // less than 5% difference
+			printf("STABALIZED\n");
+			break;
+		}
+	}
+
+	// pre-calculate scales for a few rotations to prevent the model scaling down a lot during the animation
+	for (int r = 0; r < 360; r += 30) {
+		//printf("RENDER AT %i\n", i);
+
+		for (int i = 0; i < 64; i++) {
+			settings.angles.y = r; render_model(mdl, settings);
+
+			float max = glm::max(lastScale, settings.scale);
+			float min = glm::min(lastScale, settings.scale);
+			float delta = max / min;
+			printf("SCALE rot %i part%d: %.3f %.3f %.3f\n", r, i, settings.scale, lastScale, delta);
+			lastScale = settings.scale;
+			if (delta < 1.05f) { // less than 5% difference
+				printf("STABALIZED\n");
+				break;
+			}
+
+		}
+		settings.clipScale = glm::min(settings.clipScale, settings.scale);
+		//printf("SCALE part%i: %.2f %.2f\n", i+3, settings.scale, settings.origin.z);
+	}
 }
 
 #ifdef EMSCRIPTEN
@@ -481,47 +524,7 @@ void em_loop() {
 		settings.seqFrames = header->GetSequence(0)->numframes;
 		printf("Sequence frames: %i, FPS: %f\n", header->GetSequence(0)->numframes, header->GetSequence(0)->fps);
 		
-		// calculate model size then render again to correct the camera position
-		settings.scale = 0.1f;
-		settings.clipScale = 99999;
-
-		float lastScale = 999999;
-		for (int i = 0; i < 16; i++) {
-			settings.angles.y = 0; em_loop(); settings.clipScale = 99999;
-
-			float max = glm::max(lastScale, settings.scale);
-			float min = glm::min(lastScale, settings.scale);
-			float delta = max / min;
-			printf("SCALE part%d: %.3f %.3f %.3f\n", i, settings.scale, lastScale, delta);
-			lastScale = settings.scale;
-			if (delta < 1.05f) { // less than 5% difference
-				printf("STABALIZED\n");
-				break;
-			}
-		}
-		
-		// pre-calculate scales for a few rotations to prevent the model scaling down a lot during the animation
-		for (int r = 0; r < 360; r += 90) {
-			//printf("RENDER AT %i\n", i);
-
-			for (int i = 0; i < 64; i++) {
-				settings.angles.y = r; em_loop();
-
-				float max = glm::max(lastScale, settings.scale);
-				float min = glm::min(lastScale, settings.scale);
-				float delta = max / min;
-				printf("SCALE rot %i part%d: %.3f %.3f %.3f\n", r, i, settings.scale, lastScale, delta);
-				lastScale = settings.scale;
-				if (delta < 1.05f) { // less than 5% difference
-					printf("STABALIZED\n");
-					break;
-				}
-				
-			}
-			settings.clipScale = glm::min(settings.clipScale, settings.scale);
-
-			//printf("SCALE part%i: %.2f %.2f\n", i+3, settings.scale, settings.origin.z);
-		}
+		precalculate_model_size(mdl, settings);
 
 		settings.angles.y = 0;
 		
@@ -859,11 +862,16 @@ int main( int argc, char *argv[] )
 	printf("Animation frames: %i, sequence loops: %i\n", frames, loops);	
 	
 	printf("Calculating model extents...");
+	
 	float angleStep = 360.0f / (float)frames;
+	/*
 	for (int i = 0; i < frames; i++) {
-		render_model(mdl, settings, true);
+		render_model(mdl, settings, false);
 		settings.angles.y += angleStep;
 	}
+	*/
+	
+	precalculate_model_size(mdl, settings); // TODO: use angleStep, not the hardcoded value in this func
 	printf("DONE\n");
 	
 	// now that we know how much space the model uses, draw again with a centered camera and create the images
