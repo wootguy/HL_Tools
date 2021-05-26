@@ -450,7 +450,7 @@ StudioModelLoadResult LoadStudioModel( const char* const pszFilename, CStudioMod
 	// preload textures
 	if( studioModel->m_pStudioHdr->numtextures == 0 )
 	{
-		const auto extension = bIsDol ? "T.dol" : "T.mdl";
+		auto extension = bIsDol ? "T.dol" : "T.mdl";
 
 		char texturename[ MAX_PATH_LENGTH ];
 
@@ -461,7 +461,16 @@ StudioModelLoadResult LoadStudioModel( const char* const pszFilename, CStudioMod
 
 		if( result != StudioModelLoadResult::SUCCESS )
 		{
-			return result;
+			extension = bIsDol ? "t.dol" : "t.mdl";
+			strcpy( texturename, pszFilename );
+			strcpy( &texturename[ strlen( texturename ) - 4 ], extension );
+			
+			result = LoadStudioHeader( texturename, true, studioModel->m_pTextureHdr );
+			
+			if( result != StudioModelLoadResult::SUCCESS )
+			{
+				return result;
+			}
 		}
 	}
 	else
