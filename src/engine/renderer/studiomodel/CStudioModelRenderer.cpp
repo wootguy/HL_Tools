@@ -123,23 +123,7 @@ unsigned int CStudioModelRenderer::DrawModel( studiomdl::CModelRenderInfo* const
 		{
 			SetupModel( i );
 			if( m_pRenderInfo->flTransparency > 0.0f )
-				uiDrawnPolys += DrawPoints( false );
-		}
-	}
-
-	if( flags & renderer::DrawFlag::WIREFRAME_OVERLAY )
-	{
-		//TODO: restore render mode after this? - Solokiller
-		glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-		glDisable( GL_TEXTURE_2D );
-		glDisable( GL_CULL_FACE );
-		glEnable( GL_DEPTH_TEST );
-
-		for( int i = 0; i < m_pStudioHdr->numbodyparts; i++ )
-		{
-			SetupModel( i );
-			if( m_pRenderInfo->flTransparency > 0.0f )
-				uiDrawnPolys += DrawPoints( true );
+				uiDrawnPolys += DrawPoints(flags & renderer::DrawFlag::WIREFRAME_OVERLAY);
 		}
 	}
 
@@ -931,11 +915,15 @@ unsigned int CStudioModelRenderer::DrawPoints( const bool bWireframe )
 unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const SortedMesh_t* pMeshes, const mstudiotexture_t* pTextures, const short* pSkinRef )
 {
 	//Set here since it never changes. Much more efficient.
-	if( bWireframe )
-		glColor4f( r_wireframecolor_r.GetFloat() / 255.0f,
-				   r_wireframecolor_g.GetFloat() / 255.0f,
-				   r_wireframecolor_b.GetFloat() / 255.0f,
-				   m_pRenderInfo->flTransparency );
+	if (bWireframe) {
+		/*
+		glColor4f(r_wireframecolor_r.GetFloat() / 255.0f,
+			r_wireframecolor_g.GetFloat() / 255.0f,
+			r_wireframecolor_b.GetFloat() / 255.0f,
+			m_pRenderInfo->flTransparency);
+		*/
+		glColor4f(1.0f, 0, 0, 1.0f);
+	}
 
 	unsigned int uiDrawnPolys = 0;
 
@@ -982,16 +970,14 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 			#endif
 		}
 
-		if( !bWireframe )
-		{
-			glBindTexture( GL_TEXTURE_2D, m_pRenderInfo->pModel->GetTextureId( pSkinRef[ pmesh->skinref ] ) );
-		}
+		glBindTexture( GL_TEXTURE_2D, m_pRenderInfo->pModel->GetTextureId( pSkinRef[ pmesh->skinref ] ) );
 
 		int i;
 
 		const int MAX_TRIS_PER_BODYGROUP = 4080*2; // max is actually 4080 but 40k_sisters_Tenshi overflows somehow
 		const int MAX_VERTS_PER_CALL = MAX_TRIS_PER_BODYGROUP*3;
 		static float vertexData[MAX_VERTS_PER_CALL*3];
+		static float vertexDataWireframe[MAX_VERTS_PER_CALL*3];
 		static float texCoordData[MAX_VERTS_PER_CALL*2];
 		static float colorData[MAX_VERTS_PER_CALL * 4];
 		
@@ -1091,34 +1077,31 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 					}
 				}
 
-				if ( !bWireframe )
+				if( texture.flags & STUDIO_NF_CHROME )
 				{
-					if( texture.flags & STUDIO_NF_CHROME )
-					{
-						texCoordData[texCoordIdx++] = m_chrome[ptricmds[1]][0] * s;
-						texCoordData[texCoordIdx++] = m_chrome[ptricmds[1]][1] * t;
-					}
-					else
-					{
-						texCoordData[texCoordIdx++] = ptricmds[2] * s;
-						texCoordData[texCoordIdx++] = ptricmds[3] * t;
-					}
+					texCoordData[texCoordIdx++] = m_chrome[ptricmds[1]][0] * s;
+					texCoordData[texCoordIdx++] = m_chrome[ptricmds[1]][1] * t;
+				}
+				else
+				{
+					texCoordData[texCoordIdx++] = ptricmds[2] * s;
+					texCoordData[texCoordIdx++] = ptricmds[3] * t;
+				}
 
-					if( texture.flags & STUDIO_NF_ADDITIVE )
-					{
-						colorData[colorIdx++] = 1.0f;
-						colorData[colorIdx++] = 1.0f;
-						colorData[colorIdx++] = 1.0f;
-						colorData[colorIdx++] = m_pRenderInfo->flTransparency;
-					}
-					else
-					{
-						const glm::vec3& lightVec = m_pvlightvalues[ ptricmds[ 1 ] ];
-						colorData[colorIdx++] = lightVec[0];
-						colorData[colorIdx++] = lightVec[1];
-						colorData[colorIdx++] = lightVec[2];
-						colorData[colorIdx++] = m_pRenderInfo->flTransparency;
-					}
+				if( texture.flags & STUDIO_NF_ADDITIVE )
+				{
+					colorData[colorIdx++] = 1.0f;
+					colorData[colorIdx++] = 1.0f;
+					colorData[colorIdx++] = 1.0f;
+					colorData[colorIdx++] = m_pRenderInfo->flTransparency;
+				}
+				else
+				{
+					const glm::vec3& lightVec = m_pvlightvalues[ ptricmds[ 1 ] ];
+					colorData[colorIdx++] = lightVec[0];
+					colorData[colorIdx++] = lightVec[1];
+					colorData[colorIdx++] = lightVec[2];
+					colorData[colorIdx++] = m_pRenderInfo->flTransparency;
 				}
 
 				glm::vec3 vert = m_pxformverts[ ptricmds[ 0 ] ];
@@ -1167,18 +1150,58 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 					}
 				}
 			}
+		}		
+
+		if (totalElements >= MAX_VERTS_PER_CALL) {
+			printf("VERTEX OVERFLOW: %i / %i\n", totalElements, MAX_VERTS_PER_CALL);
 		}
 
 		glVertexPointer(3, GL_FLOAT, sizeof(float) * 3, vertexData);
 		glTexCoordPointer(2, GL_FLOAT, sizeof(float) * 2, texCoordData);
 		glColorPointer(4, GL_FLOAT, sizeof(float) * 4, colorData);
 
-		if (totalElements >= MAX_VERTS_PER_CALL) {
-			printf("VERTEX OVERFLOW: %i / %i\n", totalElements, MAX_VERTS_PER_CALL);
-		}
-
 		glDrawArrays(GL_TRIANGLES, 0, totalElements);
 
+		if (bWireframe) {
+			int idx = 0;
+			// convert GL_TRIANGLES data to GL_LINES
+			for (int i = 0; i < totalElements; i += 3) {
+				vertexDataWireframe[idx++] = vertexData[i * 3];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 1];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 2];
+
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 3];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 4];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 5];
+
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 3];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 4];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 5];
+
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 6];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 7];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 8];
+
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 6];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 7];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 8];
+
+				vertexDataWireframe[idx++] = vertexData[i * 3];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 1];
+				vertexDataWireframe[idx++] = vertexData[i * 3 + 2];
+			}
+
+			glVertexPointer(3, GL_FLOAT, sizeof(float) * 3, vertexDataWireframe);
+			totalElements = idx / 3;
+
+			glDisable(GL_TEXTURE_2D);
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+			glDisableClientState(GL_COLOR_ARRAY);
+			glDrawArrays(GL_LINES, 0, totalElements);
+			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+			glEnableClientState(GL_COLOR_ARRAY);
+			glEnable(GL_TEXTURE_2D);
+		}
 
 		if ( texture.flags & STUDIO_NF_MASKED )
 			glDisable( GL_ALPHA_TEST );
