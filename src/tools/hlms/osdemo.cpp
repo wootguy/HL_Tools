@@ -418,6 +418,7 @@ static volatile bool shouldUnloadCurrentModel = false;
 
 int width = 500;
 int height = 800;
+bool g_paused = false;
 
 typedef unsigned long long uint64;
 
@@ -495,6 +496,10 @@ void em_loop() {
 	
 	if (!mdl) {
 		return; // wait for a model to be loaded
+	}
+
+	if (g_paused) {
+		return;
 	}
 	
 	uint64 now = emscripten_get_now();
@@ -597,6 +602,14 @@ extern "C" {
 		settings.frame = 0;
 
 		reset_scale();
+	}
+
+	EMSCRIPTEN_KEEPALIVE void set_body(int body) {
+		settings.body = body;
+	}
+
+	EMSCRIPTEN_KEEPALIVE void pause(int paused) {
+		g_paused = paused != 0;
 	}
 
 	EMSCRIPTEN_KEEPALIVE void reset_zoom() {
