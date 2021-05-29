@@ -1,7 +1,7 @@
 mkdir build
 cd build
 
-cmake .. -DRASPI:BOOL=true
+cmake .. -DCMAKE_BUILD_TYPE=Release -DRASPI:BOOL=true
 
 cd ..
 
