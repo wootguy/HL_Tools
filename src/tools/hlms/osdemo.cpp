@@ -466,7 +466,7 @@ void em_loop() {
 		settings = RenderSettings();
 		settings.width = width;
 		settings.height = height;
-		settings.body = 1;
+		settings.body = 255;
 
 		studiohdr_t* header = mdl->GetStudioHeader();
 		settings.idealFps = header->GetSequence(0)->fps;
@@ -755,7 +755,7 @@ int main( int argc, char *argv[] )
 	}
 	settings.width = width;
 	settings.height = height;
-	settings.body = 1; // default to "cl_himodels 1" body
+	settings.body = 255; // default to "cl_himodels 1" body
 
 	init_mesa(width, height);
 	
