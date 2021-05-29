@@ -111,7 +111,7 @@ void draw_cube(glm::vec3 min, glm::vec3 max) {
 	glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 	glDisable( GL_TEXTURE_2D );
 	glDisable( GL_CULL_FACE );
-	glDisable( GL_DEPTH_BUFFER );
+	//glDisable( GL_DEPTH_BUFFER );
 	glBegin(GL_LINE_STRIP);		
 		glColor3f( 1, 0, 0 ); glVertex3f(v1.x, v1.y, v1.z);
 		glColor3f( 1, 0, 0 ); glVertex3f(v2.x, v2.y, v2.z);
