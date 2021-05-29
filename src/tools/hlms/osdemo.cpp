@@ -82,6 +82,7 @@ struct RenderSettings {
 	int height;
 	float fov;
 	int body; // submodels to display
+	int flags;
 	
 	float idealFps;
 	int seqFrames;
@@ -94,6 +95,7 @@ struct RenderSettings {
 		seq = frame = 0;
 		fov = 65.0f;
 		body = 0;
+		flags = 0;
 	}
 };
 
@@ -293,7 +295,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings,
 	
 	// setup model for rendering
 	{
-		renderer::DrawFlags_t flags = 0;
+		renderer::DrawFlags_t flags = settings.flags;
 		
 		studiomdl::CModelRenderInfo renderInfo;
 
@@ -610,6 +612,15 @@ extern "C" {
 
 	EMSCRIPTEN_KEEPALIVE void pause(int paused) {
 		g_paused = paused != 0;
+	}
+
+	EMSCRIPTEN_KEEPALIVE void set_wireframe(int wireframe) {
+		if (wireframe != 0) {
+			settings.flags |= renderer::DrawFlag::WIREFRAME_OVERLAY;
+		}
+		else {
+			settings.flags &= ~renderer::DrawFlag::WIREFRAME_OVERLAY;
+		}
 	}
 
 	EMSCRIPTEN_KEEPALIVE void reset_zoom() {
