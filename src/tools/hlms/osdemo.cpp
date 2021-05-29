@@ -81,6 +81,7 @@ struct RenderSettings {
 	int width;
 	int height;
 	float fov;
+	int body; // submodels to display
 	
 	float idealFps;
 	int seqFrames;
@@ -92,6 +93,7 @@ struct RenderSettings {
 		clipScale = 1000.0f;
 		seq = frame = 0;
 		fov = 65.0f;
+		body = 0;
 	}
 };
 
@@ -241,7 +243,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings,
 	
 	if (!extentOnly) {
 		//glClearColor( 63.0f / 255.0f, 127.0f / 255.0f, 127.0f / 255.0f, 1.0 );
-		glClearColor( 0.2,0.4,0.4,0 );
+		//glClearColor( 0.4,0.4,0.4,0 );
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 		glViewport( 0, 0, settings.width, settings.height );
 		
@@ -304,7 +306,7 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings,
 		renderInfo.flTransparency = 1.0f;
 		renderInfo.iSequence = settings.seq;
 		renderInfo.flFrame = settings.frame;
-		renderInfo.iBodygroup = 0;
+		renderInfo.iBodygroup = settings.body;
 		renderInfo.iSkin = 0;
 
 		for( int iIndex = 0; iIndex < 2; ++iIndex )
@@ -431,6 +433,13 @@ std::deque<float> framerates;
 bool program_ready = false;
 bool calculating_size = false;
 
+void reset_scale() {
+	settings.clipScale = 99999.0f;
+	settings.scale = 99999.0f;
+	g_pStudioMdlRenderer->m_drawnCoordMin = glm::vec3(-0.001, -0.001, -0.001);
+	g_pStudioMdlRenderer->m_drawnCoordMax = glm::vec3(0.001, 0.001, 0.001);
+	render_model(mdl, settings, true);
+}
 
 void em_loop() {
 	
@@ -452,10 +461,11 @@ void em_loop() {
 		calculating_size = true;
 		g_pStudioMdlRenderer->m_drawnCoordMin = glm::vec3(9e99, 9e99, 9e99);
 		g_pStudioMdlRenderer->m_drawnCoordMax = glm::vec3(-9e99,-9e99,-9e99);
-		
+
 		settings = RenderSettings();
 		settings.width = width;
 		settings.height = height;
+		settings.body = 1;
 
 		studiohdr_t* header = mdl->GetStudioHeader();
 		settings.idealFps = header->GetSequence(0)->fps;
@@ -576,6 +586,21 @@ extern "C" {
 				hlms_model_load_complete(false);
 			);
 		}
+	}
+
+	EMSCRIPTEN_KEEPALIVE void set_animation(int idx) {
+		settings.seq = idx;
+
+		studiohdr_t* header = mdl->GetStudioHeader();
+		settings.idealFps = header->GetSequence(idx)->fps;
+		settings.seqFrames = header->GetSequence(idx)->numframes;
+		settings.frame = 0;
+
+		reset_scale();
+	}
+
+	EMSCRIPTEN_KEEPALIVE void reset_zoom() {
+		reset_scale();
 	}
 	
 	EMSCRIPTEN_KEEPALIVE void unload_model() {
