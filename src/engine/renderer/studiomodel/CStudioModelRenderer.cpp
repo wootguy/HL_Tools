@@ -974,7 +974,7 @@ unsigned int CStudioModelRenderer::DrawMeshes( const bool bWireframe, const Sort
 
 		int i;
 
-		const int MAX_TRIS_PER_BODYGROUP = 4080*2; // max is actually 4080 but 40k_sisters_Tenshi overflows somehow
+		const int MAX_TRIS_PER_BODYGROUP = 4080*5; // max is actually 4080 but kizuna_xmas overflows somehow
 		const int MAX_VERTS_PER_CALL = MAX_TRIS_PER_BODYGROUP*3;
 		static float vertexData[MAX_VERTS_PER_CALL*3];
 		static float vertexDataWireframe[MAX_VERTS_PER_CALL*3];
