@@ -56,8 +56,8 @@ if (EMSCRIPTEN)
 else()
 	target_link_libraries( ${TARGET_NAME}
 		Keyvalues
-		${GLEW}
-		${OPENGL_LIBRARIES}
+		#${GLEW}
+		#${OPENGL_LIBRARIES}
 		${SHARED_DEPENDENCIES}
 	)
 endif()

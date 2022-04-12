@@ -339,8 +339,10 @@ static void render_model(studiomdl::CStudioModel* mdl, RenderSettings& settings,
 
 	// find screen space coords of bounding box
 
-	if (!extentOnly)
+	if (!extentOnly) {
 		glPopMatrix();
+		glFinish();
+	}
 	
 	center_and_scale_model(screenMin, screenMax, settings);
 }

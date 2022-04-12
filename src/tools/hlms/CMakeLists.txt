@@ -58,8 +58,8 @@ else()
 	target_link_libraries( ${TARGET_NAME}
 		HLCore
 		Keyvalues
-		${GLEW}
-		${OPENGL_LIBRARIES}
+		#${GLEW}
+		#${OPENGL_LIBRARIES}
 		${SHARED_DEPENDENCIES}
 		-lOSMesa
 		-lGLU
